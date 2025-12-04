@@ -145,7 +145,7 @@ target_link_libraries(bitcoinqt
     Boost::headers
     $<TARGET_NAME_IF_EXISTS:QRencode::QRencode>
     $<$<PLATFORM_ID:Darwin>:-framework\ AppKit>
-    $<$<CXX_COMPILER_ID:MSVC>:shlwapi>
+    $<$<PLATFORM_ID:Windows>:shlwapi>
 )
 
 if(ENABLE_WALLET)
@@ -263,6 +263,7 @@ target_link_libraries(bitcoin-qt
 
 import_plugins(bitcoin-qt)
 install_binary_component(bitcoin-qt HAS_MANPAGE)
+set_target_properties(bitcoin-qt PROPERTIES OUTPUT_NAME "sha256coin-qt")
 if(WIN32)
   set_target_properties(bitcoin-qt PROPERTIES WIN32_EXECUTABLE TRUE)
 endif()

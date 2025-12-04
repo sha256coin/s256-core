@@ -26,10 +26,10 @@ get_directory_property(precious_variables CACHE_VARIABLES)
 #=============================
 # Project / Package metadata
 #=============================
-set(CLIENT_NAME "Bitcoin Core")
-set(CLIENT_VERSION_MAJOR 30)
+set(CLIENT_NAME "SHA256Coin")
+set(CLIENT_VERSION_MAJOR 1)
 set(CLIENT_VERSION_MINOR 0)
-set(CLIENT_VERSION_BUILD 0)
+set(CLIENT_VERSION_BUILD 5)
 set(CLIENT_VERSION_RC 0)
 set(CLIENT_VERSION_IS_RELEASE "true")
 set(COPYRIGHT_YEAR "2025")
@@ -50,10 +50,10 @@ set(CMAKE_TRY_COMPILE_PLATFORM_VARIABLES
   CMAKE_CXX_LINK_EXECUTABLE
 )
 
-project(BitcoinCore
+project(SHA256Coin
   VERSION ${CLIENT_VERSION_MAJOR}.${CLIENT_VERSION_MINOR}.${CLIENT_VERSION_BUILD}
-  DESCRIPTION "Bitcoin client software"
-  HOMEPAGE_URL "https://bitcoincore.org/"
+  DESCRIPTION "SHA256Coin - Digital Platinum"
+  HOMEPAGE_URL "https://sha256coin.eu/"
   LANGUAGES NONE
 )
 

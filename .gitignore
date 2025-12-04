@@ -16,6 +16,11 @@
 !depends/patches/**/*.patch
 
 /CMakeUserPresets.json
+/CMakeCache.txt
+/CMakeFiles/
+
+# Windows Zone Identifiers
+*:Zone.Identifier
 
 # Previous releases
 /releases

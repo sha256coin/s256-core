@@ -1,79 +1,163 @@
-Bitcoin Core integration/staging tree
-=====================================
+S256 Core - Digital Platinum
+============================
 
-https://bitcoincore.org
+**Website:** https://sha256coin.eu/
+**Block Explorer:** https://explorer.sha256coin.eu/
 
-For an immediately usable, binary version of the Bitcoin Core software, see
-https://bitcoincore.org/en/download/.
+## What is S256?
 
-What is Bitcoin Core?
----------------------
+S256 is a Bitcoin fork that takes the contrarian approach: **"Double the Work, Double the Value"**
 
-Bitcoin Core connects to the Bitcoin peer-to-peer network to download and fully
-validate blocks and transactions. It also includes a wallet and graphical user
-interface, which can be optionally built.
+Based on Bitcoin Core v30.0, S256 doubles key parameters for increased scarcity and deliberation:
 
-Further information about Bitcoin Core is available in the [doc folder](/doc).
+### Key Specifications
 
-License
--------
+| Parameter | Bitcoin | S256 |
+|-----------|---------|------|
+| Block Time | 10 minutes | **20 minutes** |
+| Block Reward | 50 BTC | **100 S256** |
+| Total Supply | 21 million | **42 million** |
+| Halving Interval | 210,000 blocks (~4 years) | **420,000 blocks (~8 years)** |
+| Coinbase Maturity | 100 confirmations | **200 confirmations** |
+| Algorithm | SHA256 (PoW) | **SHA256 (PoW)** |
 
-Bitcoin Core is released under the terms of the MIT license. See [COPYING](COPYING) for more
-information or see https://opensource.org/license/MIT.
+### Network Details
 
-Development Process
--------------------
+- **Port:** 25256
+- **RPC Port:** 25332
+- **Address Prefix:** S (e.g., S1A2B3C...)
+- **Script Address Prefix:** 8
+- **Bech32 HRP:** s2
+- **Magic Bytes:** 0xf1, 0xc2, 0xa5, 0xd8
 
-The `master` branch is regularly built (see `doc/build-*.md` for instructions) and tested, but it is not guaranteed to be
-completely stable. [Tags](https://github.com/bitcoin/bitcoin/tags) are created
-regularly from release branches to indicate new official, stable release versions of Bitcoin Core.
+### Genesis Block
 
-The https://github.com/bitcoin-core/gui repository is used exclusively for the
-development of the GUI. Its master branch is identical in all monotree
-repositories. Release branches and tags do not exist, so please do not fork
-that repository unless it is for development reasons.
+- **Hash:** `00000000abe2a78ceb00eca81258804d59fe4ad45345e1750e705139e6da7297`
+- **Timestamp:** November 30, 2025
+- **Message:** "S256 2025-11-30 Double the Work Double the Value"
 
-The contribution workflow is described in [CONTRIBUTING.md](CONTRIBUTING.md)
-and useful hints for developers can be found in [doc/developer-notes.md](doc/developer-notes.md).
+## Building S256 Core
 
-Testing
--------
+### Dependencies
 
-Testing and code review is the bottleneck for development; we get more pull
-requests than we can review and test on short notice. Please be patient and help out by testing
-other people's pull requests, and remember this is a security-critical project where any mistake might cost people
-lots of money.
+Refer to the build documentation in the `doc/` folder:
+- Linux: [doc/build-unix.md](doc/build-unix.md)
+- Windows: [doc/build-windows.md](doc/build-windows.md)
+- macOS: [doc/build-osx.md](doc/build-osx.md)
 
-### Automated Testing
+### Quick Build (Linux)
 
-Developers are strongly encouraged to write [unit tests](src/test/README.md) for new code, and to
-submit new unit tests for old code. Unit tests can be compiled and run
-(assuming they weren't disabled during the generation of the build system) with: `ctest`. Further details on running
-and extending unit tests can be found in [/src/test/README.md](/src/test/README.md).
+```bash
+# Install dependencies (Ubuntu/Debian)
+sudo apt-get update
+sudo apt-get install build-essential cmake pkg-config \
+    libssl-dev libevent-dev libboost-all-dev libsqlite3-dev
 
-There are also [regression and integration tests](/test), written
-in Python.
-These tests can be run (if the [test dependencies](/test) are installed) with: `build/test/functional/test_runner.py`
-(assuming `build` is your build directory).
+# Build
+cmake -B build
+cmake --build build -j$(nproc)
 
-The CI (Continuous Integration) systems make sure that every pull request is tested on Windows, Linux, and macOS.
-The CI must pass on all commits before merge to avoid unrelated CI failures on new pull requests.
+# Binaries will be in: build/bin/
+```
 
-### Manual Quality Assurance (QA) Testing
+### Cross-Compile for Windows (Linux)
 
-Changes should be tested by somebody other than the developer who wrote the
-code. This is especially important for large or high-risk changes. It is useful
-to add a test plan to the pull request description if testing the changes is
-not straightforward.
+```bash
+# Install mingw-w64
+sudo apt-get install g++-mingw-w64-x86-64
 
-Translations
-------------
+# Configure and build
+cmake -B build-win \
+    -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/x86_64-w64-mingw32.cmake \
+    -DBUILD_GUI=OFF
 
-Changes to translations as well as new translations can be submitted to
-[Bitcoin Core's Transifex page](https://explore.transifex.com/bitcoin/bitcoin/).
+cmake --build build-win -j$(nproc)
 
-Translations are periodically pulled from Transifex and merged into the git repository. See the
-[translation process](doc/translation_process.md) for details on how this works.
+# Windows binaries will be in: build-win/bin/
+```
 
-**Important**: We do not accept translation changes as GitHub pull requests because the next
-pull from Transifex would automatically overwrite them again.
+## Running S256
+
+### Start the daemon:
+```bash
+./build/bin/bitcoind -daemon
+```
+
+### Check blockchain status:
+```bash
+./build/bin/bitcoin-cli getblockchaininfo
+```
+
+### Stop the daemon:
+```bash
+./build/bin/bitcoin-cli stop
+```
+
+### Data Directory
+
+**Linux:** `~/.sha256coin/`
+**Windows:** `%APPDATA%\SHA256Coin\`
+**macOS:** `~/Library/Application Support/SHA256Coin/`
+
+### Configuration
+
+Create `s256.conf` in your data directory for custom settings:
+```ini
+# RPC Settings
+rpcuser=yourusername
+rpcpassword=yourpassword
+rpcallowip=127.0.0.1
+
+# Network
+port=25256
+rpcport=25332
+
+# Optional: Add nodes
+addnode=sha256coin.eu:25256
+```
+
+## Mining
+
+S256 uses SHA256 Proof-of-Work, compatible with Bitcoin mining hardware (ASICs).
+
+**Solo Mining:**
+```bash
+./bitcoin-cli generatetoaddress 1 "your_s256_address"
+```
+
+**Pool Mining:** Contact pool operators or set up your own using sha256-nomp.
+
+## Links
+
+- **Website:** https://sha256coin.eu/
+- **Block Explorer:** https://explorer.sha256coin.eu/
+- **GitHub:** https://github.com/sha256coin
+
+## Philosophy
+
+> **"Digital Platinum"** - Because excellence takes effort.
+
+S256 embraces difficulty rather than avoiding it:
+- Harder to mine, not easier
+- Longer block times for deliberation
+- True scarcity through proof of real work
+
+## Security
+
+- **Exchange Deposits:** 500+ confirmations recommended
+- **Consensus:** Pure Proof-of-Work
+- **Difficulty Adjustment:** Every 1,008 blocks (~14 days)
+
+## License
+
+S256 Core is released under the terms of the MIT license. See [COPYING](COPYING) for more information or see https://opensource.org/license/MIT.
+
+## Development
+
+S256 is based on Bitcoin Core v30.0 and maintains compatibility with Bitcoin's proven codebase while implementing the 2x parameter modifications.
+
+For technical details on the modifications, see the documentation in the `/doc` folder.
+
+---
+
+*Fork of Bitcoin Core - Modified for S256 specifications*

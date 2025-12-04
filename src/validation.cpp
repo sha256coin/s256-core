@@ -1926,8 +1926,8 @@ CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
     if (halvings >= 64)
         return 0;
 
-    CAmount nSubsidy = 50 * COIN;
-    // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
+    CAmount nSubsidy = 100 * COIN;  // S256: 100 S256 initial reward (2x Bitcoin's 50 BTC)
+    // Subsidy is cut in half every 420,000 blocks which will occur approximately every 8 years.
     nSubsidy >>= halvings;
     return nSubsidy;
 }
@@ -2011,6 +2011,14 @@ bool ChainstateManager::IsInitialBlockDownload() const
     if (chain.Tip() == nullptr) {
         return true;
     }
+
+    // S256: Exit IBD immediately at genesis block for new chain launch
+    if (chain.Tip()->nHeight == 0) {
+        LogInfo("S256: At genesis block, exiting IBD\n");
+        m_cached_finished_ibd.store(true, std::memory_order_relaxed);
+        return false;
+    }
+
     if (chain.Tip()->nChainWork < MinimumChainWork()) {
         return true;
     }
