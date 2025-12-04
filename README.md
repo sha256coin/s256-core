@@ -101,7 +101,7 @@ cmake --build build-win -j$(nproc)
 
 ### Configuration
 
-Create `s256.conf` in your data directory for custom settings:
+Create `sha256coin.conf` in your data directory for custom settings:
 ```ini
 # RPC Settings
 rpcuser=yourusername
