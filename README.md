@@ -132,6 +132,8 @@ S256 uses SHA256 Proof-of-Work, compatible with Bitcoin mining hardware (ASICs).
 - **Website:** https://sha256coin.eu/
 - **Block Explorer:** https://explorer.sha256coin.eu/
 - **GitHub:** https://github.com/sha256coin
+- **Discord:** https://discord.gg/dtn58HrC94
+- **Telegram:** https://t.me/+Ecf4ApES37NjZTBk
 
 ## Philosophy
 
