@@ -16,7 +16,7 @@ Based on Bitcoin Core v30.0, S256 doubles key parameters for increased scarcity 
 |-----------|---------|------|
 | Block Time | 10 minutes | **20 minutes** |
 | Block Reward | 50 BTC | **100 S256** |
-| Total Supply | 21 million | **42 million** |
+| Total Supply | 21 million | **84 million** |
 | Halving Interval | 210,000 blocks (~4 years) | **420,000 blocks (~8 years)** |
 | Coinbase Maturity | 100 confirmations | **200 confirmations** |
 | Algorithm | SHA256 (PoW) | **SHA256 (PoW)** |
@@ -47,6 +47,7 @@ Refer to the build documentation in the `doc/` folder:
 
 ### Quick Build (Linux)
 
+#### Option 1: CLI Only (daemon + bitcoin-cli)
 ```bash
 # Install dependencies (Ubuntu/Debian)
 sudo apt-get update
@@ -59,6 +60,27 @@ cmake --build build -j$(nproc)
 
 # Binaries will be in: build/bin/
 ```
+
+#### Option 2: With GUI (sha256coin-qt)
+```bash
+# Install all dependencies including Qt libraries (Ubuntu/Debian)
+sudo apt-get update
+sudo apt-get install build-essential cmake pkg-config \
+    libssl-dev libevent-dev libboost-all-dev libsqlite3-dev \
+    libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 \
+    libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libfontconfig1 \
+    libfreetype6
+
+# Build with GUI enabled
+cmake -B build -DBUILD_GUI=ON
+cmake --build build -j$(nproc)
+
+# GUI wallet: build/bin/sha256coin-qt
+# Daemon: build/bin/sha256coind
+# CLI: build/bin/sha256coin-cli
+```
+
+**Note:** If you get "library not found" errors when running the GUI, install the missing Qt/X11 libraries listed above.
 
 ### Cross-Compile for Windows (Linux)
 
