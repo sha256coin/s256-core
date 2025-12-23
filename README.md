@@ -17,7 +17,7 @@ Based on Bitcoin Core v30.0, S256 doubles key parameters for increased scarcity 
 | Block Time | 10 minutes | **20 minutes** |
 | Block Reward | 50 BTC | **100 S256** |
 | Total Supply | 21 million | **84 million** |
-| Halving Interval | 210,000 blocks (~4 years) | **420,000 blocks (~8 years)** |
+| Halving Interval | 210,000 blocks (~4 years) | **420,000 blocks (~16 years)** |
 | Coinbase Maturity | 100 confirmations | **200 confirmations** |
 | Algorithm | SHA256 (PoW) | **SHA256 (PoW)** |
 
