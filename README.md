@@ -37,7 +37,8 @@ Based on Bitcoin Core v30.0, S256 doubles key parameters for increased scarcity 
 - **Message:** "S256 2025-11-30 Double the Work Double the Value"
 
 ## Building S256 Core
-
+Download Current Compiled Binaries from the Official Web Site:
+                **https://sha256coin.eu/#downloads**
 ### Dependencies
 
 Refer to the build documentation in the `doc/` folder:
