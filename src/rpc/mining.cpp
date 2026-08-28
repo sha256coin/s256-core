@@ -1207,6 +1207,14 @@ static RPCHelpMan createauxblock()
         throw JSONRPCError(RPC_OUT_OF_MEMORY, "Could not create new block template");
     }
     auto block = std::make_shared<CBlock>(block_template->getBlock());
+    // Set VERSION_AUXPOW_BIT before computing the hash handed out below: this
+    // hash is what the parent pool commits to in its merge-mining tag, and
+    // it must exactly match the hash CheckAuxPow recomputes at submission
+    // time from the final (auxpow-bit-set) header — GetHash() covers
+    // nVersion (a genuine pure-header field), so setting the bit later, in
+    // submitauxblock, would silently change the hash out from under an
+    // already-committed proof and make every submission fail.
+    block->nVersion |= VERSION_AUXPOW_BIT;
     const uint256 hash = block->GetHash();
 
     int height;
@@ -1283,8 +1291,10 @@ static RPCHelpMan submitauxblock()
         }
     }
 
+    // VERSION_AUXPOW_BIT is already set on this template — createauxblock
+    // sets it before handing out the hash the caller committed to, so it
+    // must not be touched again here (see the comment there).
     block->auxpow = auxpow;
-    block->nVersion |= VERSION_AUXPOW_BIT;
 
     ChainstateManager& chainman = EnsureAnyChainman(request.context);
     {

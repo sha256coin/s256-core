@@ -51,6 +51,10 @@ int CAuxPow::GetExpectedIndex(uint32_t nNonce, int nChainId, unsigned int h)
     // cause of the original AuxPoW "index confusion" issue, where a single
     // chain-merkle branch could otherwise validate against more than one
     // aux-chain slot and be misattributed across chains sharing a parent.
+    //
+    // nNonce here must be the merge-mining tag's own nonce field (fixed once
+    // when the coinbase is built), never the parent header's PoW-search
+    // nNonce — see the call site in CheckAuxPow for why.
     uint32_t rand = nNonce;
     rand = rand * 1103515245 + 12345;
     rand += static_cast<uint32_t>(nChainId);
@@ -77,27 +81,10 @@ bool CAuxPow::CheckAuxPow(const uint256& hashAuxBlock, unsigned int nBits, int n
                               "auxpow chain merkle branch is longer than allowed");
     }
 
-    // --- Expected-index check: this IS the chain-ID / anti-replay guard -
-    // There is no separate "chain ID" field carried inside the serialized
-    // proof to check against consensus.nAuxpowChainId — chain identity is
-    // instead proven entirely by *where* this chain's hash is required to
-    // sit in the merge-mining tree. nChainId here is always this chain's own
-    // consensus.nAuxpowChainId (passed in by the caller), so a proof that was
-    // actually built for a different aux chain sharing the same parent
-    // coinbase will, in general, have been placed at a different slot and
-    // will fail this comparison. Skipping this check (accepting any
-    // self-consistent branch/index pair without recomputing the expected
-    // slot) was the root cause of the original Namecoin AuxPoW "index
-    // confusion" issue — never weaken or remove it.
-    const int nExpectedIndex = GetExpectedIndex(parentBlock.nNonce, nChainId,
-                                                 static_cast<unsigned int>(vChainMerkleBranch.size()));
-    if (nChainIndex != nExpectedIndex) {
-        return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "auxpow-wrong-index",
-                              "auxpow chain merkle index does not match the expected deterministic slot for this "
-                              "chain ID / parent nonce / tree size");
-    }
-
     // --- Locate the merge-mining tag in the parent coinbase --------------
+    // Parsed before the expected-index check below, because that check needs
+    // the tag's own merkleNonce field (see the comment there for why it must
+    // NOT use parentBlock.nNonce).
     const CScript& scriptSig = coinbaseTx->vin[0].scriptSig;
     const auto tagBegin = std::search(scriptSig.begin(), scriptSig.end(),
                                        std::begin(MERGE_MINING_HEADER), std::end(MERGE_MINING_HEADER));
@@ -146,9 +133,34 @@ bool CAuxPow::CheckAuxPow(const uint256& hashAuxBlock, unsigned int nBits, int n
                               "auxpow merge-mining tag's claimed tree size does not match the supplied chain "
                               "merkle branch length");
     }
-    if (merkleNonce != parentBlock.nNonce) {
-        return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "auxpow-wrong-merkle-nonce",
-                              "auxpow merge-mining tag's nonce does not match the parent block's nonce");
+
+    // --- Expected-index check: this IS the chain-ID / anti-replay guard -
+    // There is no separate "chain ID" field carried inside the serialized
+    // proof to check against consensus.nAuxpowChainId — chain identity is
+    // instead proven entirely by *where* this chain's hash is required to
+    // sit in the merge-mining tree. nChainId here is always this chain's own
+    // consensus.nAuxpowChainId (passed in by the caller), so a proof that was
+    // actually built for a different aux chain sharing the same parent
+    // coinbase will, in general, have been placed at a different slot and
+    // will fail this comparison. Skipping this check (accepting any
+    // self-consistent branch/index pair without recomputing the expected
+    // slot) was the root cause of the original Namecoin AuxPoW "index
+    // confusion" issue — never weaken or remove it.
+    //
+    // Keyed on merkleNonce (the tag's own nonce field, fixed once when the
+    // coinbase/merge-mining tag is built), NOT parentBlock.nNonce (the
+    // header field a miner sweeps through millions of times per second
+    // without ever touching the coinbase again). Tying this to the header's
+    // search nonce would force rebuilding the whole coinbase and merkle tree
+    // on every single hash attempt, making merge-mining computationally
+    // infeasible — that was a real bug caught by testing before this ever
+    // reached production.
+    const int nExpectedIndex = GetExpectedIndex(merkleNonce, nChainId,
+                                                 static_cast<unsigned int>(vChainMerkleBranch.size()));
+    if (nChainIndex != nExpectedIndex) {
+        return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "auxpow-wrong-index",
+                              "auxpow chain merkle index does not match the expected deterministic slot for this "
+                              "chain ID / merkle nonce / tree size");
     }
 
     // --- Chain merkle branch: hashAuxBlock -> chainMerkleRoot ------------

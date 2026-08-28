@@ -125,6 +125,12 @@ public:
      * Namecoin AuxPoW "index confusion" issue, where a single chain-merkle
      * branch could otherwise be misattributed across aux chains sharing one
      * parent coinbase.
+     *
+     * nNonce must be the merge-mining tag's own nonce field — fixed once
+     * when the coinbase is built, and independent of the parent header's
+     * nNonce, which a miner sweeps through repeatedly without touching the
+     * coinbase. Keying this on the header's search nonce instead would force
+     * rebuilding the coinbase/merkle tree on every hash attempt.
      */
     static int GetExpectedIndex(uint32_t nNonce, int nChainId, unsigned int h);
 };
