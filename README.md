@@ -10,7 +10,7 @@ S256 is a Bitcoin fork that takes the contrarian approach: **"Double the Work, D
 
 Based on Bitcoin Core v30.0, S256 doubles key parameters for increased scarcity and deliberation:
 
-## What's New in v2.0.0
+## What's New in v2.0.1
 
 A coordinated hard fork activating at **block 17,500** on mainnet, bundling two consensus changes plus network/RPC improvements:
 
@@ -18,6 +18,7 @@ A coordinated hard fork activating at **block 17,500** on mainnet, bundling two 
 - **LWMA difficulty adjustment** — replaces the classic 1,008-block-window DAA with per-block LWMA (96-block window) from block 17,500 onward. The old DAA could leave the chain stuck at a too-high difficulty for up to a full 1,008-block window if hashrate dropped suddenly; LWMA responds within a handful of blocks instead.
 - **Additional DNS + fixed seed nodes** for more resilient peer discovery (previously a single point of failure).
 - **RPC help text fixes** — example amounts now correctly show `S256` instead of a leftover `BTC`.
+- **v2.0.1**: fixes two AuxPoW bugs found by new end-to-end test coverage before activation — a merge-mining tag nonce that was incorrectly tied to the parent header's own mining nonce (would have made merge-mining computationally infeasible), and a hash-timing mismatch between `createauxblock` and validation that would have made every `submitauxblock` call fail. Neither was ever active on mainnet (both predate block 17,500), so no chain impact — see the [v2.0.1 commit](https://github.com/sha256coin/s256-core/commit/6f39940304) for details.
 
 ### Key Specifications
 
@@ -198,7 +199,7 @@ S256 embraces difficulty rather than avoiding it:
 
 - **Exchange Deposits:** 500+ confirmations recommended
 - **Consensus:** Pure Proof-of-Work
-- **Difficulty Adjustment:** Classic 1,008-block window (~14 days) below block 17,500; per-block LWMA (96-block window) from block 17,500 onward — see [What's New in v2.0.0](#whats-new-in-v200)
+- **Difficulty Adjustment:** Classic 1,008-block window (~14 days) below block 17,500; per-block LWMA (96-block window) from block 17,500 onward — see [What's New in v2.0.1](#whats-new-in-v201)
 
 ## License
 
