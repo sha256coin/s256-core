@@ -6,10 +6,14 @@
 #ifndef BITCOIN_PRIMITIVES_BLOCK_H
 #define BITCOIN_PRIMITIVES_BLOCK_H
 
+#include <auxpow.h>
+#include <primitives/pureheader.h>
 #include <primitives/transaction.h>
 #include <serialize.h>
 #include <uint256.h>
 #include <util/time.h>
+
+#include <memory>
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work
@@ -17,50 +21,44 @@
  * to everyone and the block is added to the block chain.  The first transaction
  * in the block is a special one that creates a new coin owned by the creator
  * of the block.
+ *
+ * From the AuxpowStartHeight activation height onward, a block may instead be
+ * proven via an auxiliary proof-of-work (see auxpow.h): nVersion has
+ * VERSION_AUXPOW_BIT set and `auxpow` is populated. GetHash() is inherited
+ * unchanged from CPureBlockHeader and is always computed over just the 6 pure
+ * header fields — it never depends on `auxpow` — because the whole AuxPoW
+ * mechanism relies on a parent chain's coinbase committing to this block's
+ * hash as a fixed quantity that exists before the auxpow proof is built.
  */
-class CBlockHeader
+class CBlockHeader : public CPureBlockHeader
 {
 public:
-    // header
-    int32_t nVersion;
-    uint256 hashPrevBlock;
-    uint256 hashMerkleRoot;
-    uint32_t nTime;
-    uint32_t nBits;
-    uint32_t nNonce;
+    /** Present only when VERSION_AUXPOW_BIT is set in nVersion. */
+    std::shared_ptr<CAuxPow> auxpow;
 
     CBlockHeader()
     {
         SetNull();
     }
 
-    SERIALIZE_METHODS(CBlockHeader, obj) { READWRITE(obj.nVersion, obj.hashPrevBlock, obj.hashMerkleRoot, obj.nTime, obj.nBits, obj.nNonce); }
+    SERIALIZE_METHODS(CBlockHeader, obj)
+    {
+        READWRITE(AsBase<CPureBlockHeader>(obj));
+        if (obj.nVersion & VERSION_AUXPOW_BIT) {
+            SER_READ(obj, obj.auxpow = std::make_shared<CAuxPow>());
+            READWRITE(*obj.auxpow);
+        }
+    }
 
     void SetNull()
     {
-        nVersion = 0;
-        hashPrevBlock.SetNull();
-        hashMerkleRoot.SetNull();
-        nTime = 0;
-        nBits = 0;
-        nNonce = 0;
+        CPureBlockHeader::SetNull();
+        auxpow.reset();
     }
 
-    bool IsNull() const
+    bool IsAuxpow() const
     {
-        return (nBits == 0);
-    }
-
-    uint256 GetHash() const;
-
-    NodeSeconds Time() const
-    {
-        return NodeSeconds{std::chrono::seconds{nTime}};
-    }
-
-    int64_t GetBlockTime() const
-    {
-        return (int64_t)nTime;
+        return (nVersion & VERSION_AUXPOW_BIT) != 0;
     }
 };
 

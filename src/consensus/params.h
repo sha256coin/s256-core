@@ -27,8 +27,15 @@ enum BuriedDeployment : int16_t {
     DEPLOYMENT_DERSIG,
     DEPLOYMENT_CSV,
     DEPLOYMENT_SEGWIT,
+    // S256: height at which the auxiliary proof-of-work (merged mining) format
+    // becomes valid. A one-way, permanently-buried consensus change like the
+    // others above, just activated ahead of the tip rather than retroactively.
+    DEPLOYMENT_AUXPOW,
+    // S256: height at which difficulty adjustment switches from the classic
+    // fixed-window DAA to per-block LWMA. See LwmaStartHeight below.
+    DEPLOYMENT_LWMA,
 };
-constexpr bool ValidDeployment(BuriedDeployment dep) { return dep <= DEPLOYMENT_SEGWIT; }
+constexpr bool ValidDeployment(BuriedDeployment dep) { return dep <= DEPLOYMENT_LWMA; }
 
 enum DeploymentPos : uint16_t {
     DEPLOYMENT_TESTDUMMY,
@@ -106,6 +113,22 @@ struct Params {
     /** Don't warn about unknown BIP 9 activations below this height.
      * This prevents us from warning about the CSV and segwit activations. */
     int MinBIP9WarningHeight;
+    /** S256: Block height at which the auxiliary proof-of-work (merged mining)
+     * format becomes valid. Blocks with VERSION_AUXPOW_BIT set in nVersion are
+     * rejected below this height (see ContextualCheckBlockHeader) — legacy
+     * (non-auxpow) blocks remain valid at every height, including after. */
+    int AuxpowStartHeight;
+    /** S256: This chain's own merge-mining chain ID. Used only to derive the
+     * expected chain-merkle-tree slot in CAuxPow::CheckAuxPow — see auxpow.h
+     * for why this is the actual anti-cross-chain-replay mechanism rather
+     * than a literal field compared for equality. */
+    int nAuxpowChainId;
+    /** S256: Block height at which difficulty adjustment switches from the
+     * classic fixed-window DAA (CalculateNextWorkRequired) to per-block LWMA
+     * (LwmaCalculateNextWorkRequired, pow.cpp) — see that function for why:
+     * the classic DAA can leave the chain stuck at a too-high difficulty for
+     * a full retarget window if hashrate drops suddenly. */
+    int LwmaStartHeight;
     std::array<BIP9Deployment,MAX_VERSION_BITS_DEPLOYMENTS> vDeployments;
     /** Proof of work parameters */
     uint256 powLimit;
@@ -148,6 +171,10 @@ struct Params {
             return CSVHeight;
         case DEPLOYMENT_SEGWIT:
             return SegwitHeight;
+        case DEPLOYMENT_AUXPOW:
+            return AuxpowStartHeight;
+        case DEPLOYMENT_LWMA:
+            return LwmaStartHeight;
         } // no default case, so the compiler can warn about missing cases
         return std::numeric_limits<int>::max();
     }

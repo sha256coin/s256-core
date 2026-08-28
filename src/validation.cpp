@@ -3931,9 +3931,12 @@ void ChainstateManager::ReceivedBlockTransactions(const CBlock& block, CBlockInd
 
 static bool CheckBlockHeader(const CBlockHeader& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fCheckPOW = true)
 {
-    // Check proof of work matches claimed amount
-    if (fCheckPOW && !CheckProofOfWork(block.GetHash(), block.nBits, consensusParams))
-        return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "high-hash", "proof of work failed");
+    // Check proof of work matches claimed amount. CheckProofOfWork(header, ...)
+    // transparently handles both legacy and auxpow-formatted blocks (see
+    // pow.cpp/auxpow.cpp) — auxpow validity needs no height context, only the
+    // *format* being allowed yet is height-gated, in ContextualCheckBlockHeader.
+    if (fCheckPOW && !CheckProofOfWork(block, consensusParams, state))
+        return false;
 
     return true;
 }
@@ -4127,8 +4130,15 @@ std::vector<unsigned char> ChainstateManager::GenerateCoinbaseCommitment(CBlock&
 
 bool HasValidProofOfWork(const std::vector<CBlockHeader>& headers, const Consensus::Params& consensusParams)
 {
+    // Anti-DoS prefilter, runs before any chain context (pindexPrev/height) is
+    // known, so it cannot enforce the AuxpowStartHeight format gate — but it
+    // still performs the FULL auxpow verification (parent PoW + merkle
+    // commitments) via the header-aware CheckProofOfWork overload, so an
+    // auxpow-formatted spam header still needs genuine parent-chain
+    // proof-of-work to pass, same DoS cost as before. The format-allowed-yet
+    // check happens later in ContextualCheckBlockHeader once height is known.
     return std::all_of(headers.cbegin(), headers.cend(),
-            [&](const auto& header) { return CheckProofOfWork(header.GetHash(), header.nBits, consensusParams);});
+            [&](const auto& header) { return CheckProofOfWork(header, consensusParams);});
 }
 
 bool IsBlockMutated(const CBlock& block, bool check_witness_root)
@@ -4195,6 +4205,18 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     const Consensus::Params& consensusParams = chainman.GetConsensus();
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-diffbits", "incorrect proof of work");
+
+    // S256: the auxpow *format* is only allowed from AuxpowStartHeight onward.
+    // CheckBlockHeader (above, in the accept pipeline) already verified the
+    // proof itself is cryptographically valid when the bit is set — this is
+    // purely a "is this format allowed yet at this height" gate, which needs
+    // pindexPrev/nHeight and so can only happen here, not in the earlier
+    // height-context-free checks. Legacy (non-auxpow) blocks are unaffected
+    // and remain valid at every height, including after activation.
+    if (block.IsAuxpow() && !DeploymentActiveAfter(pindexPrev, chainman, Consensus::DEPLOYMENT_AUXPOW)) {
+        return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "auxpow-not-yet-active",
+                              "auxpow format is not yet active at this height");
+    }
 
     // Check timestamp against prev
     if (block.GetBlockTime() <= pindexPrev->GetMedianTimePast())

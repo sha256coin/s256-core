@@ -5,6 +5,7 @@
 
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
+#include <auxpow.h>
 #include <chain.h>
 #include <chainparams.h>
 #include <chainparamsbase.h>
@@ -1134,6 +1135,185 @@ static RPCHelpMan submitheader()
     };
 }
 
+// --- S256 AuxPoW (merged mining) RPCs ---------------------------------
+//
+// createauxblock/submitauxblock let a *different* coin's pool (the parent)
+// merge-mine S256 as an aux chain: createauxblock hands out an S256 block
+// hash to embed in the parent's own coinbase merge-mining tag; once the
+// parent pool has mined a qualifying block, submitauxblock takes the
+// resulting AuxPow proof (parent coinbase + both merkle branches + parent
+// header) and submits the completed S256 block. Modeled on the conventional
+// Namecoin/Dogecoin-style getauxblock/submitauxblock RPC shape.
+//
+// Deliberately NOT sharing getblocktemplate's single static block_template:
+// multiple independent parent pools may poll createauxblock concurrently,
+// each needing their own in-flight template to submit against later.
+namespace {
+GlobalMutex g_auxblock_mutex;
+std::map<uint256, std::shared_ptr<CBlock>> g_auxblock_templates GUARDED_BY(g_auxblock_mutex);
+
+//! Drop any tracked templates no longer built on the current tip, so pollers
+//! that never submit don't leak memory indefinitely.
+void PruneStaleAuxBlockTemplates(const uint256& current_tip) EXCLUSIVE_LOCKS_REQUIRED(g_auxblock_mutex)
+{
+    for (auto it = g_auxblock_templates.begin(); it != g_auxblock_templates.end();) {
+        if (it->second->hashPrevBlock != current_tip) {
+            it = g_auxblock_templates.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+} // namespace
+
+static RPCHelpMan createauxblock()
+{
+    return RPCHelpMan{
+        "createauxblock",
+        "Creates a new S256 block template to be merge-mined as an auxiliary chain underneath a different coin's parent block.\n",
+        {
+            {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The S256 address that will receive the block reward if this aux block is submitted and accepted."},
+        },
+        RPCResult{
+            RPCResult::Type::OBJ, "", "",
+            {
+                {RPCResult::Type::STR_HEX, "hash", "hash of the new aux block; embed this in the parent chain's merge-mining coinbase tag"},
+                {RPCResult::Type::NUM, "chainid", "this chain's merge-mining chain ID"},
+                {RPCResult::Type::STR_HEX, "previousblockhash", "hash of the current S256 tip this template builds on"},
+                {RPCResult::Type::NUM, "coinbasevalue", "value of the block reward, in satoshis"},
+                {RPCResult::Type::STR_HEX, "bits", "compact target of the next S256 block"},
+                {RPCResult::Type::STR_HEX, "target", "expanded target of the next S256 block"},
+                {RPCResult::Type::NUM, "height", "height of the next S256 block"},
+            },
+        },
+        RPCExamples{
+            HelpExampleCli("createauxblock", "\"myaddress\"")
+            + HelpExampleRpc("createauxblock", "\"myaddress\"")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    CTxDestination destination = DecodeDestination(request.params[0].get_str());
+    if (!IsValidDestination(destination)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Error: Invalid address");
+    }
+    const CScript coinbase_output_script = GetScriptForDestination(destination);
+
+    NodeContext& node = EnsureAnyNodeContext(request.context);
+    Mining& miner = EnsureMining(node);
+    ChainstateManager& chainman = EnsureChainman(node);
+
+    std::unique_ptr<BlockTemplate> block_template(miner.createNewBlock({ .coinbase_output_script = coinbase_output_script }));
+    if (!block_template) {
+        throw JSONRPCError(RPC_OUT_OF_MEMORY, "Could not create new block template");
+    }
+    auto block = std::make_shared<CBlock>(block_template->getBlock());
+    const uint256 hash = block->GetHash();
+
+    int height;
+    {
+        LOCK(cs_main);
+        height = chainman.ActiveHeight() + 1;
+    }
+
+    {
+        LOCK(g_auxblock_mutex);
+        PruneStaleAuxBlockTemplates(block->hashPrevBlock);
+        g_auxblock_templates[hash] = block;
+    }
+
+    const arith_uint256 target = arith_uint256().SetCompact(block->nBits);
+
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("hash", hash.GetHex());
+    result.pushKV("chainid", chainman.GetParams().GetConsensus().nAuxpowChainId);
+    result.pushKV("previousblockhash", block->hashPrevBlock.GetHex());
+    result.pushKV("coinbasevalue", (int64_t)block->vtx[0]->vout[0].nValue);
+    result.pushKV("bits", strprintf("%08x", block->nBits));
+    result.pushKV("target", target.GetHex());
+    result.pushKV("height", (int64_t)height);
+    return result;
+},
+    };
+}
+
+static RPCHelpMan submitauxblock()
+{
+    return RPCHelpMan{
+        "submitauxblock",
+        "Submits a completed AuxPow proof for a previously requested createauxblock template.\n",
+        {
+            {"hash", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "hash of the aux block, as returned by createauxblock"},
+            {"auxpow", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "hex-encoded serialized AuxPow proof (parent coinbase, both merkle branches, and the parent block header)"},
+        },
+        RPCResult{
+            RPCResult::Type::BOOL, "", "whether the submitted proof was valid and the block was accepted"
+        },
+        RPCExamples{
+            HelpExampleCli("submitauxblock", "\"hash\" \"auxpowhex\"")
+            + HelpExampleRpc("submitauxblock", "\"hash\" \"auxpowhex\"")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    const uint256 hash = ParseHashV(request.params[0], "hash");
+
+    std::shared_ptr<CBlock> block;
+    {
+        LOCK(g_auxblock_mutex);
+        auto it = g_auxblock_templates.find(hash);
+        if (it == g_auxblock_templates.end()) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "block hash unknown; call createauxblock first, or the template expired");
+        }
+        // Copy out: the tracked template may still be handed to other
+        // concurrent submitters/pruned while we validate this one.
+        block = std::make_shared<CBlock>(*it->second);
+    }
+
+    const std::string auxpow_hex = request.params[1].get_str();
+    if (!IsHex(auxpow_hex)) {
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "auxpow is not valid hex");
+    }
+    auto auxpow = std::make_shared<CAuxPow>();
+    {
+        const std::vector<unsigned char> auxpow_data{ParseHex(auxpow_hex)};
+        DataStream ser_auxpow{auxpow_data};
+        try {
+            ser_auxpow >> *auxpow;
+        } catch (const std::exception&) {
+            throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "auxpow decode failed");
+        }
+    }
+
+    block->auxpow = auxpow;
+    block->nVersion |= VERSION_AUXPOW_BIT;
+
+    ChainstateManager& chainman = EnsureAnyChainman(request.context);
+    {
+        LOCK(cs_main);
+        const CBlockIndex* pindex = chainman.m_blockman.LookupBlockIndex(block->hashPrevBlock);
+        if (pindex) {
+            chainman.UpdateUncommittedBlockStructures(*block, pindex);
+        }
+    }
+
+    bool new_block;
+    auto sc = std::make_shared<submitblock_StateCatcher>(block->GetHash());
+    CHECK_NONFATAL(chainman.m_options.signals)->RegisterSharedValidationInterface(sc);
+    bool accepted = chainman.ProcessNewBlock(block, /*force_processing=*/true, /*min_pow_checked=*/true, /*new_block=*/&new_block);
+    CHECK_NONFATAL(chainman.m_options.signals)->UnregisterSharedValidationInterface(sc);
+
+    {
+        LOCK(g_auxblock_mutex);
+        g_auxblock_templates.erase(hash);
+    }
+
+    if (!new_block && accepted) {
+        return true; // duplicate of an already-accepted block
+    }
+    return sc->found && sc->state.IsValid();
+},
+    };
+}
+
 void RegisterMiningRPCCommands(CRPCTable& t)
 {
     static const CRPCCommand commands[]{
@@ -1144,6 +1324,8 @@ void RegisterMiningRPCCommands(CRPCTable& t)
         {"mining", &getblocktemplate},
         {"mining", &submitblock},
         {"mining", &submitheader},
+        {"mining", &createauxblock},
+        {"mining", &submitauxblock},
 
         {"hidden", &generatetoaddress},
         {"hidden", &generatetodescriptor},

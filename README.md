@@ -10,6 +10,15 @@ S256 is a Bitcoin fork that takes the contrarian approach: **"Double the Work, D
 
 Based on Bitcoin Core v30.0, S256 doubles key parameters for increased scarcity and deliberation:
 
+## What's New in v2.0.0
+
+A coordinated hard fork activating at **block 17,500** on mainnet, bundling two consensus changes plus network/RPC improvements:
+
+- **AuxPoW (merged mining)** — other SHA256 coins' pools can now merge-mine S256 alongside their own chain at no extra cost to their miners' hashrate. S256 itself is unaffected either way: legacy (non-AuxPoW) blocks remain valid forever, before and after activation. See [AuxPoW / Merged Mining](#auxpow--merged-mining) below.
+- **LWMA difficulty adjustment** — replaces the classic 1,008-block-window DAA with per-block LWMA (96-block window) from block 17,500 onward. The old DAA could leave the chain stuck at a too-high difficulty for up to a full 1,008-block window if hashrate dropped suddenly; LWMA responds within a handful of blocks instead.
+- **Additional DNS + fixed seed nodes** for more resilient peer discovery (previously a single point of failure).
+- **RPC help text fixes** — example amounts now correctly show `S256` instead of a leftover `BTC`.
+
 ### Key Specifications
 
 | Parameter | Bitcoin | S256 |
@@ -29,6 +38,8 @@ Based on Bitcoin Core v30.0, S256 doubles key parameters for increased scarcity 
 - **Script Address Prefix:** 8
 - **Bech32 HRP:** s2
 - **Magic Bytes:** 0xf1, 0xc2, 0xa5, 0xd8
+- **DNS Seeds:** `seednode.sha256coin.eu`, `s256seednode.bitcoinsilver.eu`, `sha256-mining.go.ro`
+- **Fixed Seeds:** hardcoded fallback peer IPs baked into the binary (see `contrib/seeds/nodes_main.txt`), so peer discovery still works if DNS is unavailable
 
 ### Genesis Block
 
@@ -150,6 +161,22 @@ S256 uses SHA256 Proof-of-Work, compatible with Bitcoin mining hardware (ASICs).
 
 **Pool Mining:** Contact pool operators or set up your own using sha256-nomp.
 
+## AuxPoW / Merged Mining
+
+Starting at block 17,500, S256 supports auxiliary proof-of-work (AuxPoW), the same merged-mining
+mechanism used by Namecoin, Dogecoin, and other coins. Any other SHA256 chain's pool can merge-mine
+S256 alongside its own block, at no extra cost to its miners' hashrate.
+
+- **Chain ID:** `0x53323536`
+- **RPC methods:** `createauxblock <address>` returns a new S256 block template to embed in the parent
+  chain's coinbase; `submitauxblock <hash> <auxpow-hex>` submits the completed proof once the parent
+  pool has mined a qualifying block.
+- **Compatibility:** legacy (non-AuxPoW) blocks remain valid at every height, before and after
+  activation — solo miners and existing pools are unaffected.
+
+See `src/auxpow.h`/`src/auxpow.cpp` for the AuxPoW proof format and validation, and `src/rpc/mining.cpp`
+for the RPC implementation.
+
 ## Links
 
 - **Website:** https://sha256coin.eu/
@@ -171,7 +198,7 @@ S256 embraces difficulty rather than avoiding it:
 
 - **Exchange Deposits:** 500+ confirmations recommended
 - **Consensus:** Pure Proof-of-Work
-- **Difficulty Adjustment:** Every 1,008 blocks (~14 days)
+- **Difficulty Adjustment:** Classic 1,008-block window (~14 days) below block 17,500; per-block LWMA (96-block window) from block 17,500 onward — see [What's New in v2.0.0](#whats-new-in-v200)
 
 ## License
 

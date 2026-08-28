@@ -64,6 +64,7 @@ add_library(bitcoin_consensus STATIC EXCLUDE_FROM_ALL
   consensus/tx_check.cpp
   hash.cpp
   primitives/block.cpp
+  primitives/pureheader.cpp
   primitives/transaction.cpp
   pubkey.cpp
   script/interpreter.cpp
@@ -86,6 +87,7 @@ endif()
 # Similar to `bitcoin_util` library, but higher-level.
 add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   addresstype.cpp
+  auxpow.cpp
   base58.cpp
   bech32.cpp
   chain.cpp

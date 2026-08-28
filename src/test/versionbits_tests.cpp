@@ -480,4 +480,23 @@ BOOST_FIXTURE_TEST_CASE(versionbits_computeblockversion, BlockVersionTest)
     }
 }
 
+BOOST_AUTO_TEST_CASE(versionbits_auxpow_bit_reserved)
+{
+    // S256: bit 8 (VERSION_AUXPOW_BIT, see auxpow.h) must never be assigned
+    // as a BIP9Deployment.bit on any network — see the reservation note next
+    // to VERSIONBITS_NUM_BITS in versionbits.h. There's no compile-time way
+    // to enforce this since deployment bits are runtime literals set per
+    // network in kernel/chainparams.cpp, so this test is the actual guard
+    // against a future accidental collision.
+    ArgsManager args;
+    for (const auto chainType : {ChainType::MAIN, ChainType::TESTNET, ChainType::TESTNET4, ChainType::SIGNET, ChainType::REGTEST}) {
+        const auto chainParams = CreateChainParams(args, chainType);
+        for (const auto& dep : chainParams->GetConsensus().vDeployments) {
+            BOOST_CHECK_MESSAGE(dep.bit != 8,
+                                 "A BIP9Deployment claims bit 8, which is permanently reserved for VERSION_AUXPOW_BIT on "
+                                     + ChainTypeToString(chainType));
+        }
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

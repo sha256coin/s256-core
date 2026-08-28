@@ -5,13 +5,7 @@
 
 #include <primitives/block.h>
 
-#include <hash.h>
 #include <tinyformat.h>
-
-uint256 CBlockHeader::GetHash() const
-{
-    return (HashWriter{} << *this).GetHash();
-}
 
 std::string CBlock::ToString() const
 {

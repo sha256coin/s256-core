@@ -24,6 +24,16 @@ static const int32_t VERSIONBITS_TOP_MASK = 0xE0000000UL;
 /** Total bits available for versionbits */
 static const int32_t VERSIONBITS_NUM_BITS = 29;
 
+/**
+ * S256: bit 8 (0x00000100) of nVersion is permanently reserved as
+ * VERSION_AUXPOW_BIT (see auxpow.h) and must NEVER be assigned as a
+ * BIP9Deployment.bit for any future soft fork, even though it falls inside
+ * the 0-28 range VERSIONBITS_NUM_BITS otherwise makes available. There is no
+ * compile-time way to enforce this since deployment bits are assigned as
+ * runtime literals per-network in kernel/chainparams.cpp — see
+ * src/test/versionbits_tests.cpp for a test asserting no deployment uses it.
+ */
+
 /** Opaque type for BIP9 state. See versionbits_impl.h for details. */
 enum class ThresholdState : uint8_t;
 

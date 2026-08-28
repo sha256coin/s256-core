@@ -380,9 +380,16 @@ TestChain100Setup::TestChain100Setup(
 
     {
         LOCK(::cs_main);
+        // S256: this fork's genesis/subsidy parameters differ from upstream
+        // Bitcoin Core (see kernel/chainparams.cpp "2x parameters" — doubled
+        // block reward), so every block's coinbase, and therefore every
+        // block hash in this deterministically-mined 100-block chain, differs
+        // from upstream's hardcoded expected value. Recomputed for this fork;
+        // BUILD_TESTS was OFF prior to the AuxPoW work so this had never
+        // actually been exercised before, unrelated to the AuxPoW changes.
         assert(
             m_node.chainman->ActiveChain().Tip()->GetBlockHash().ToString() ==
-            "0c8c5f79505775a0f6aed6aca2350718ceb9c6f2c878667864d5c7a6d8ffa2a6");
+            "7809d61c8bdf45d2c5ee8e84c45a30ad0e1d87c0ab3ed9f876342d495129a20c");
     }
 }
 

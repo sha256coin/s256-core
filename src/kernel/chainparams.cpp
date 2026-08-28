@@ -96,6 +96,19 @@ public:
         consensus.CSVHeight = 1626; // S256: Activated at block 1626 (CHECKSEQUENCEVERIFY)
         consensus.SegwitHeight = 1626; // S256: Activated at block 1626 (SegWit/witness data)
         consensus.MinBIP9WarningHeight = 2016; // S256: First difficulty adjustment period
+        // S256: AuxPoW (merged mining) + LWMA difficulty adjustment hard fork,
+        // bundled into one coordinated upgrade. Chosen ahead of the tip
+        // (~16,808 at the time this was set) to give both existing pool
+        // operators and holders lead time to upgrade before it activates.
+        consensus.AuxpowStartHeight = 17500;
+        consensus.nAuxpowChainId = 0x53323536; // S256: arbitrary local merge-mining chain ID ("S256" in ASCII hex)
+        // S256: switch from the classic 1008-block-window DAA to per-block
+        // LWMA (N=96) at the same height as AuxPoW above. The classic DAA
+        // can leave the chain stuck at a too-high difficulty for up to a
+        // full 1008-block window if hashrate drops suddenly — LWMA responds
+        // within a handful of blocks instead. See LwmaCalculateNextWorkRequired
+        // in pow.cpp.
+        consensus.LwmaStartHeight = 17500;
         consensus.powLimit = uint256{"00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // 14 days (1008 blocks)
         consensus.nPowTargetSpacing = 20 * 60;
@@ -139,12 +152,11 @@ public:
         assert(consensus.hashGenesisBlock == uint256{"00000000abe2a78ceb00eca81258804d59fe4ad45345e1750e705139e6da7297"});
         assert(genesis.hashMerkleRoot == uint256{"328fbe73f2b764658b57a0ac538d67e59b5c6bcde2c266a71bbb842f5430d595"});
 
-        // DNS seeds will be added once S256 network is established
         vSeeds.clear();
-        vSeeds.emplace_back("sha256coin.eu");
+        vSeeds.emplace_back("seednode.sha256coin.eu");
+        vSeeds.emplace_back("s256seednode.bitcoinsilver.eu");
         vSeeds.emplace_back("sha256-mining.go.ro");
-        vSeeds.emplace_back("btcs-vps13.duckdns.org");
-
+ 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,63);  // S256 addresses start with 'S'
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,18);  // S256 script addresses start with '8'
         base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,191); // Unique private key prefix
@@ -153,7 +165,11 @@ public:
 
         bech32_hrp = "s2";
 
-        vFixedSeeds.clear();  // S256: No fixed seeds yet, new network
+        // S256: fixed fallback seeds — the same 4 known-good nodes as the DNS
+        // seeds above (resolved to IPs), so peer discovery still works even
+        // if DNS is unavailable. Regenerate via
+        // contrib/seeds/generate-seeds.py if these nodes' addresses change.
+        vFixedSeeds = std::vector<uint8_t>(std::begin(chainparams_seed_main), std::end(chainparams_seed_main));
 
         fDefaultConsistencyChecks = false;
         m_is_mockable_chain = false;
@@ -190,6 +206,9 @@ public:
         consensus.CSVHeight = 770112; // 00000000025e930139bac5c6c31a403776da130831ab85be56578f3fa75369bb
         consensus.SegwitHeight = 834624; // 00000000002b980fcd729daaa248fd9316a5200e9b367f4ff2c42453e84201ca
         consensus.MinBIP9WarningHeight = 836640; // segwit activation height + miner confirmation window
+        consensus.AuxpowStartHeight = 1; // S256: always active on testnet
+        consensus.nAuxpowChainId = 0x53323536;
+        consensus.LwmaStartHeight = 1; // S256: always active on testnet
         consensus.powLimit = uint256{"00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         consensus.nPowTargetSpacing = 20 * 60;
@@ -286,6 +305,9 @@ public:
         consensus.CSVHeight = 1;
         consensus.SegwitHeight = 1;
         consensus.MinBIP9WarningHeight = 0;
+        consensus.AuxpowStartHeight = 1; // S256: always active on testnet4
+        consensus.nAuxpowChainId = 0x53323536;
+        consensus.LwmaStartHeight = 1; // S256: always active on testnet4
         consensus.powLimit = uint256{"00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         consensus.nPowTargetSpacing = 20 * 60;
@@ -425,6 +447,9 @@ public:
         consensus.BIP66Height = 1;
         consensus.CSVHeight = 1;
         consensus.SegwitHeight = 1;
+        consensus.AuxpowStartHeight = 1; // S256: always active on signet
+        consensus.nAuxpowChainId = 0x53323536;
+        consensus.LwmaStartHeight = 1; // S256: always active on signet
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         consensus.nPowTargetSpacing = 20 * 60;
         consensus.fPowAllowMinDifficultyBlocks = false;
@@ -502,6 +527,9 @@ public:
         consensus.BIP66Height = 1;  // Always active unless overridden
         consensus.CSVHeight = 1;    // Always active unless overridden
         consensus.SegwitHeight = 0; // Always active unless overridden
+        consensus.AuxpowStartHeight = 0; // Always active unless overridden (see opts.activation_heights below)
+        consensus.nAuxpowChainId = 0x53323536;
+        consensus.LwmaStartHeight = 0; // Always active unless overridden (see opts.activation_heights below)
         consensus.MinBIP9WarningHeight = 0;
         consensus.powLimit = uint256{"7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
         consensus.nPowTargetTimespan = 24 * 60 * 60; // one day
@@ -552,6 +580,12 @@ public:
                 break;
             case Consensus::BuriedDeployment::DEPLOYMENT_CSV:
                 consensus.CSVHeight = int{height};
+                break;
+            case Consensus::BuriedDeployment::DEPLOYMENT_AUXPOW:
+                consensus.AuxpowStartHeight = int{height};
+                break;
+            case Consensus::BuriedDeployment::DEPLOYMENT_LWMA:
+                consensus.LwmaStartHeight = int{height};
                 break;
             }
         }
