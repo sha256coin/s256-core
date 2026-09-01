@@ -336,6 +336,7 @@ BASE_SCRIPTS = [
     'p2p_tx_privacy.py',
     'rpc_getdescriptoractivity.py',
     'rpc_scanblocks.py',
+    'tool_bitcoin.py',
     'p2p_sendtxrcncl.py',
     'rpc_scantxoutset.py',
     'feature_unsupported_utxo_db.py',
@@ -548,6 +549,11 @@ def main():
 
 def run_tests(*, test_list, build_dir, tmpdir, jobs=1, enable_coverage=False, args=None, combined_logs_len=0, failfast=False, use_term_control, results_filepath=None):
     args = args or []
+
+    # Some optional Python dependencies (e.g. pycapnp) may emit warnings or fail under
+    # CPython free-threaded builds when the GIL is disabled. Force it on for all
+    # functional tests so every child process inherits PYTHON_GIL=1.
+    os.environ["PYTHON_GIL"] = "1"
 
     # Warn if bitcoind is already running
     try:
@@ -764,7 +770,7 @@ class TestHandler:
                         status = "Passed"
                     elif proc.returncode == TEST_EXIT_SKIPPED:
                         status = "Skipped"
-                        skip_reason = re.search(r"Test Skipped: (.*)", stdout).group(1)
+                        skip_reason = re.search(r"Test Skipped: (.*)", stdout).group(1).strip()
                     else:
                         status = "Failed"
                     self.jobs.remove(job)

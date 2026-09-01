@@ -94,7 +94,7 @@ int CalculateMaximumSignedInputSize(const CTxOut& txout, const COutPoint outpoin
     if (!provider) return -1;
 
     if (const auto desc = InferDescriptor(txout.scriptPubKey, *provider)) {
-        if (const auto weight = MaxInputWeight(*desc, {}, coin_control, true, can_grind_r)) {
+        if (const auto weight = MaxInputWeight(*desc, CTxIn{outpoint}, coin_control, true, can_grind_r)) {
             return static_cast<int>(GetVirtualTransactionSize(*weight, 0, 0));
         }
     }
@@ -403,6 +403,11 @@ CoinsResult AvailableCoins(const CWallet& wallet,
                     if (wtx.tx->version != TRUC_VERSION) continue;
                     // this unconfirmed v3 transaction already has a child
                     if (wtx.truc_child_in_mempool.has_value()) continue;
+
+                    // this unconfirmed v3 transaction has a parent: spending would create a third generation
+                    size_t ancestors, descendants;
+                    wallet.chain().getTransactionAncestry(wtx.tx->GetHash(), ancestors, descendants);
+                    if (ancestors > 1) continue;
                 } else {
                     if (wtx.tx->version == TRUC_VERSION) continue;
                     Assume(!wtx.truc_child_in_mempool.has_value());
@@ -923,7 +928,7 @@ util::Result<SelectionResult> AutomaticCoinSelection(const CWallet& wallet, Coin
             if (group.m_ancestors >= max_ancestors || group.m_descendants >= max_descendants) total_unconf_long_chain += group.GetSelectionAmount();
         }
 
-        if (CAmount total_amount = available_coins.GetTotalAmount() - total_discarded < value_to_select) {
+        if (CAmount total_amount = available_coins.GetTotalAmount() - total_discarded; total_amount < value_to_select) {
             // Special case, too-long-mempool cluster.
             if (total_amount + total_unconf_long_chain > value_to_select) {
                 return util::Error{_("Unconfirmed UTXOs are available, but spending them creates a chain of transactions that will be rejected by the mempool")};

@@ -2,6 +2,7 @@
              ((gnu packages bash) #:select (bash-minimal))
              (gnu packages bison)
              ((gnu packages certs) #:select (nss-certs))
+             ((gnu packages check) #:select (libfaketime))
              ((gnu packages cmake) #:select (cmake-minimal))
              (gnu packages commencement)
              (gnu packages compression)
@@ -209,7 +210,17 @@ and abstract ELF, PE and MachO formats.")
                (base32
                 "1j47vwq4caxfv0xw68kw5yh00qcpbd56d7rq6c483ma3y7s96yyz"))))
     (build-system cmake-build-system)
-    (inputs (list openssl))
+    (arguments
+     (list
+      #:phases
+      #~(modify-phases %standard-phases
+          (replace 'check
+            (lambda* (#:key tests? #:allow-other-keys)
+              (if tests?
+                  (invoke "faketime" "-f" "@2025-01-01 00:00:00" ;; Tests fail after 2025.
+                          "ctest" "--output-on-failure" "--no-tests=error")
+                  (format #t "test suite not run~%")))))))
+    (inputs (list libfaketime openssl))
     (home-page "https://github.com/mtrojnar/osslsigncode")
     (synopsis "Authenticode signing and timestamping tool")
     (description "osslsigncode is a small tool that implements part of the
@@ -493,36 +504,6 @@ inspecting signatures in Mach-O binaries.")
                    (("^install-others =.*$")
                     (string-append "install-others = " out "/etc/rpc\n")))))))))))))
 
-;; The sponge tool from moreutils.
-(define-public sponge
-  (package
-    (name "sponge")
-    (version "0.69")
-    (source (origin
-              (method url-fetch)
-              (uri (string-append
-                    "https://git.joeyh.name/index.cgi/moreutils.git/snapshot/
-                    moreutils-" version ".tar.gz"))
-              (file-name (string-append "moreutils-" version ".tar.gz"))
-              (sha256
-               (base32
-                "1l859qnzccslvxlh5ghn863bkq2vgmqgnik6jr21b9kc6ljmsy8g"))))
-    (build-system gnu-build-system)
-    (arguments
-     (list #:phases
-           #~(modify-phases %standard-phases
-               (delete 'configure)
-               (replace 'install
-                (lambda* (#:key outputs #:allow-other-keys)
-                  (let ((bin (string-append (assoc-ref outputs "out") "/bin")))
-                  (install-file "sponge" bin)))))
-           #:make-flags
-           #~(list "sponge" (string-append "CC=" #$(cc-for-target)))))
-    (home-page "https://joeyh.name/code/moreutils/")
-    (synopsis "Miscellaneous general-purpose command-line tools")
-    (description "Just sponge")
-    (license license:gpl2+)))
-
 (packages->manifest
  (append
   (list ;; The Basics
@@ -537,7 +518,6 @@ inspecting signatures in Mach-O binaries.")
         patch
         gawk
         sed
-        sponge
         ;; Compression and archiving
         tar
         gzip

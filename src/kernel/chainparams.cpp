@@ -156,7 +156,7 @@ public:
         vSeeds.emplace_back("seednode.sha256coin.eu");
         vSeeds.emplace_back("s256seednode.bitcoinsilver.eu");
         vSeeds.emplace_back("sha256-mining.go.ro");
- 
+
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,63);  // S256 addresses start with 'S'
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,18);  // S256 script addresses start with '8'
         base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,191); // Unique private key prefix
