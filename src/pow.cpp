@@ -24,7 +24,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     // why. A plain height comparison rather than DeploymentActiveAfter, since
     // this function only has pindexLast, not a ChainstateManager/versionbitscache.
     if (pindexLast->nHeight + 1 >= params.LwmaStartHeight) {
-        return LwmaCalculateNextWorkRequired(pindexLast, params);
+        return LwmaCalculateNextWorkRequired(pindexLast, pblock, params);
     }
 
     unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
@@ -105,7 +105,7 @@ unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nF
 // block from a weighted average of the last N blocks' (clamped) solve
 // times, so difficulty tracks hashrate changes within a handful of blocks
 // instead of being stuck at a stale value for up to a full retarget window.
-unsigned int LwmaCalculateNextWorkRequired(const CBlockIndex* pindexLast, const Consensus::Params& params)
+unsigned int LwmaCalculateNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader* pblock, const Consensus::Params& params)
 {
     // S256: mirror the classic DAA's own fPowNoRetargeting check (see
     // CalculateNextWorkRequired above). Regtest sets fPowNoRetargeting=true precisely so
@@ -122,6 +122,22 @@ unsigned int LwmaCalculateNextWorkRequired(const CBlockIndex* pindexLast, const 
     const int64_t k = N * (N + 1) * T / 2;
     const int64_t height = pindexLast->nHeight;
     const arith_uint256 powLimit = UintToArith256(params.powLimit);
+
+    // S256: classic DAA's testnet min-difficulty-blocks rule (see
+    // GetNextWorkRequired above), reimplemented here because LWMA otherwise
+    // never consults fPowAllowMinDifficultyBlocks at all. Without this,
+    // testnet (where LWMA is active from height 1) is exactly as hard to
+    // mine as mainnet, since both share the same powLimit — defeating the
+    // whole point of the flag. If the new block arrives more than 2x the
+    // target spacing after its parent, it may use powLimit directly, same
+    // as the classic rule. Unlike the classic rule, this doesn't walk back
+    // to find the "last non-min-difficulty block" to re-anchor from: LWMA's
+    // own N-block weighted window already absorbs an occasional easy block
+    // and re-adjusts within it, so that extra bookkeeping isn't needed here.
+    if (params.fPowAllowMinDifficultyBlocks &&
+        pblock->GetBlockTime() > pindexLast->GetBlockTime() + T * 2) {
+        return powLimit.GetCompact();
+    }
 
     if (height < N) { return powLimit.GetCompact(); }
 

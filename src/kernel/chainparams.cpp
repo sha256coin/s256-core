@@ -204,7 +204,19 @@ public:
         consensus.AuxpowStartHeight = 1; // S256: always active on testnet
         consensus.nAuxpowChainId = 0x53323536;
         consensus.LwmaStartHeight = 1; // S256: always active on testnet
-        consensus.powLimit = uint256{"00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
+        // S256: deliberately easier than mainnet's powLimit (which
+        // compact-encodes to the same 0x1d00ffff difficulty-1 floor as
+        // genesis, despite looking larger in raw hex form -- compact
+        // encoding only keeps the top 3 significant bytes). This value
+        // compact-encodes to 0x1e00ffff, one exponent step (256x) easier,
+        // so a single CPU thread finds a block in on the order of seconds
+        // rather than tens of minutes -- both when this is used directly
+        // (LwmaCalculateNextWorkRequired's height<N bootstrap, pow.cpp) and
+        // as the fallback for the min-difficulty-blocks rule (see
+        // fPowAllowMinDifficultyBlocks below, and the mirrored rule inside
+        // LwmaCalculateNextWorkRequired -- without a genuinely easier
+        // powLimit here, that rule has nothing easier to fall back to).
+        consensus.powLimit = uint256{"000000ffff000000000000000000000000000000000000000000000000000000"};
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         consensus.nPowTargetSpacing = 20 * 60;
         consensus.fPowAllowMinDifficultyBlocks = true;
