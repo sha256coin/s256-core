@@ -40,6 +40,12 @@ struct AuxPowTestingSetup : public RegTestingSetup {
     {
         BlockAssembler::Options options;
         options.coinbase_output_script = CScript{} << marker << OP_TRUE;
+        // Regtest heights here are low (<=16): CScript() << nHeight alone
+        // serializes to a single-byte OP_N push for BIP34, one byte short of
+        // the consensus-required 2-byte-minimum coinbase scriptSig -- see
+        // node/miner.cpp's include_dummy_extranonce option and its comment
+        // ("...bad-cb-length") for why this padding is needed at low heights.
+        options.include_dummy_extranonce = true;
         auto tmpl = BlockAssembler{m_node.chainman->ActiveChainstate(), m_node.mempool.get(), options}.CreateNewBlock();
         auto block = std::make_shared<CBlock>(tmpl->block);
         // The real createauxblock RPC builds its template via the higher-level
@@ -158,7 +164,7 @@ BOOST_AUTO_TEST_CASE(auxpow_valid_proof_accepted)
     // AuxBlockCandidate already set VERSION_AUXPOW_BIT before hashAuxBlock was
     // captured above, so attaching the auxpow blob itself must not change the
     // hash (GetHash() is inherited unchanged from CPureBlockHeader).
-    BOOST_CHECK_EQUAL(block->GetHash(), hashAuxBlock);
+    BOOST_CHECK_EQUAL(block->GetHash().ToString(), hashAuxBlock.ToString());
 
     bool new_block = false;
     auto sc = std::make_shared<DiagStateCatcher>(hashAuxBlock);
@@ -169,7 +175,7 @@ BOOST_AUTO_TEST_CASE(auxpow_valid_proof_accepted)
                         << " reason=" << sc->state.GetRejectReason() << " debug=" << sc->state.GetDebugMessage());
     BOOST_CHECK(accepted);
     BOOST_CHECK(new_block);
-    BOOST_CHECK_EQUAL(m_node.chainman->ActiveTip()->GetBlockHash(), hashAuxBlock);
+    BOOST_CHECK_EQUAL(m_node.chainman->ActiveTip()->GetBlockHash().ToString(), hashAuxBlock.ToString());
 }
 
 BOOST_AUTO_TEST_CASE(auxpow_wrong_chain_index_rejected)
@@ -295,13 +301,13 @@ BOOST_AUTO_TEST_CASE(auxpow_header_hash_independent_of_auxpow)
     auto auxpow = BuildValidAuxPow(hashBefore, block->nBits);
     block->auxpow = std::make_shared<CAuxPow>(auxpow);
 
-    BOOST_CHECK_EQUAL(block->GetHash(), hashBefore);
+    BOOST_CHECK_EQUAL(block->GetHash().ToString(), hashBefore.ToString());
 
     DataStream stream;
     stream << TX_WITH_WITNESS(*block);
     CBlock roundTripped;
     stream >> TX_WITH_WITNESS(roundTripped);
-    BOOST_CHECK_EQUAL(roundTripped.GetHash(), hashBefore);
+    BOOST_CHECK_EQUAL(roundTripped.GetHash().ToString(), hashBefore.ToString());
     BOOST_CHECK(roundTripped.IsAuxpow());
     BOOST_CHECK(roundTripped.auxpow != nullptr);
 }
