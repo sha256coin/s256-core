@@ -365,33 +365,41 @@ public:
         consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000009a0fe15d0177d086304"};
         consensus.defaultAssumeValid = uint256{"0000000002368b1e4ee27e2e85676ae6f9f9e69579b29093e9a82c170bf7cf8a"}; // 123613
 
-        pchMessageStart[0] = 0x1c;
-        pchMessageStart[1] = 0x16;
-        pchMessageStart[2] = 0x3f;
-        pchMessageStart[3] = 0x28;
+        // S256: was byte-for-byte identical to real Bitcoin testnet4's own
+        // magic bytes (0x1c163f28) -- same class of bug already fixed for
+        // testnet3 (see CTestNetParams). Related to but distinct from
+        // S256's other chains' magic bytes.
+        pchMessageStart[0] = 0xf4;
+        pchMessageStart[1] = 0xc5;
+        pchMessageStart[2] = 0xa8;
+        pchMessageStart[3] = 0xdb;
         nDefaultPort = 48333;
         nPruneAfterHeight = 1000;
         m_assumed_blockchain_size = 31;
         m_assumed_chain_state_size = 2;
 
-        const char* testnet4_genesis_msg = "03/May/2024 000000000000000000001ebd58c244970b3aa9d783bb001011fbe8ea8e98e00e";
-        const CScript testnet4_genesis_script = CScript() << "000000000000000000000000000000000000000000000000000000000000000000"_hex << OP_CHECKSIG;
-        genesis = CreateGenesisBlock(testnet4_genesis_msg,
-                testnet4_genesis_script,
-                1714777860,
-                393743547,
-                0x1d00ffff,
-                1,
-                50 * COIN);
+        // S256: this used to be real Bitcoin testnet4's own genesis block,
+        // completely unmodified (verbatim coinbase message referencing a
+        // real historical Bitcoin block hash, placeholder all-zero pubkey
+        // script, and the resulting hash matched real Bitcoin testnet4's
+        // actual genesis hash exactly). Replaced with a real, separately
+        // mined S256 genesis using the same shared coinbase
+        // message/pubkey as mainnet/testnet/regtest (see the 5-arg
+        // CreateGenesisBlock overload above), kept at real difficulty-1
+        // (0x1d00ffff, matching consensus.enforce_BIP94's intent of a
+        // harder-to-abuse testnet than testnet3 -- unlike testnet3, this
+        // chain's powLimit is deliberately NOT lowered).
+        genesis = CreateGenesisBlock(1788307200, 1560552529, 0x1d00ffff, 1, 50 * COIN);  // Sep 2, 2026
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256{"00000000da84f2bafbbc53dee25a72ae507ff4914b867c565be350b0da8bf043"});
-        //         assert(genesis.hashMerkleRoot == uint256{"7aa0a7ae1e223414cb807e40cd57e667b718e42aaf9306db9102fe28912b7b4e"});
+        assert(consensus.hashGenesisBlock == uint256{"000000003803d8b625b3acced2a64ccf74ef33d16efaa57e1aa08da402a01d78"});
+        assert(genesis.hashMerkleRoot == uint256{"10eea688c8ea4279596b96394d3c234064c566f61aeeb41976fa379bc4500e65"});
 
+        // S256: these were real Bitcoin testnet4 DNS seed hostnames (Sjors
+        // Provoost, Jason Maurice) -- see CTestNetParams for the same fix
+        // applied to testnet3. Cleared until S256 has its own testnet4 seed
+        // infrastructure.
         vFixedSeeds.clear();
         vSeeds.clear();
-        // nodes with support for servicebits filtering should be at the top
-        vSeeds.emplace_back("seed.testnet4.bitcoin.sprovoost.nl."); // Sjors Provoost
-        vSeeds.emplace_back("seed.testnet4.wiz.biz."); // Jason Maurice
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,196);
@@ -401,7 +409,11 @@ public:
 
         bech32_hrp = "ts2";
 
-        vFixedSeeds = std::vector<uint8_t>(std::begin(chainparams_seed_testnet4), std::end(chainparams_seed_testnet4));
+        // S256: chainparams_seed_testnet4 is real Bitcoin testnet4's own
+        // fixed-seed IP list -- this used to silently repopulate
+        // vFixedSeeds with those real Bitcoin addresses right after
+        // clearing it above (see CTestNetParams for the same fix). Left
+        // empty until S256 has its own testnet4 fixed seeds to generate.
 
         fDefaultConsistencyChecks = false;
         m_is_mockable_chain = false;
