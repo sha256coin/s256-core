@@ -2,17 +2,21 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <arith_uint256.h>
 #include <chain.h>
 #include <chainparams.h>
 #include <pow.h>
 #include <test/util/random.h>
 #include <test/util/common.h>
 #include <test/util/setup_common.h>
+#include <uint256.h>
 #include <util/chaintype.h>
 
 #include <boost/test/unit_test.hpp>
 
 #include <limits>
+#include <memory>
+#include <vector>
 
 BOOST_FIXTURE_TEST_SUITE(pow_tests, BasicTestingSetup)
 
@@ -92,6 +96,100 @@ BOOST_AUTO_TEST_CASE(get_next_work_upper_limit_actual)
     // Test that increasing nbits further would not be a PermittedDifficultyTransition.
     unsigned int invalid_nbits = expected_nbits+1;
     BOOST_CHECK(!PermittedDifficultyTransition(consensus, pindexLast.nHeight+1, pindexLast.nBits, invalid_nbits));
+}
+
+/* S256: guard the AuxPoW/LWMA hard fork against the failure mode seen on a
+ * comparable chain's ASERT-based fork, where the post-fork difficulty
+ * algorithm was anchored wrong and the chain opened at powLimit instead of
+ * the prevailing pre-fork difficulty. LWMA has no separate anchor value to
+ * get wrong -- LwmaCalculateNextWorkRequired (pow.cpp) derives its very
+ * first post-fork target directly from the real preceding N=96 blocks'
+ * nBits/timestamps -- but nothing previously exercised that bootstrap at
+ * mainnet's actual LwmaStartHeight with realistic (classic-DAA) history
+ * leading into it: the other boundary tests above deliberately push
+ * LwmaStartHeight out of range to test the classic math in isolation
+ * instead. This test builds that history and pins down that the fork opens
+ * near the prevailing difficulty, not at powLimit.
+ */
+BOOST_AUTO_TEST_CASE(get_next_work_lwma_activation_transition)
+{
+    const auto consensus = CreateChainParams(*m_node.args, ChainType::MAIN)->GetConsensus();
+    const int64_t T = consensus.nPowTargetSpacing;
+    const int activation_height = consensus.LwmaStartHeight;
+    BOOST_REQUIRE(activation_height > 200); // needs room for >N blocks of pre-fork history
+
+    // A "real" pre-fork difficulty, well above powLimit's minimum -- an
+    // established chain's difficulty, not a fresh/minimum-difficulty one.
+    arith_uint256 classic_target = UintToArith256(consensus.powLimit) / 1000;
+    const unsigned int classic_nbits = classic_target.GetCompact();
+    classic_target.SetCompact(classic_nbits); // round-trip: compact encoding loses precision
+
+    // Synthetic classic-DAA history for the blocks immediately preceding
+    // activation, all mined exactly on schedule (steady hashrate) at the
+    // same difficulty -- classic DAA only retargets every 2016 blocks, so a
+    // constant nBits across this window is the realistic case, and the
+    // ordinary situation the fork will actually open into.
+    std::vector<std::unique_ptr<CBlockIndex>> chain;
+    const int history_len = 150;
+    const int first_height = activation_height - history_len;
+    int64_t t = 1700000000;
+    CBlockIndex* tip = nullptr;
+    for (int h = first_height; h < activation_height; ++h) {
+        auto pindex = std::make_unique<CBlockIndex>();
+        pindex->nHeight = h;
+        pindex->nTime = static_cast<uint32_t>(t);
+        pindex->nBits = classic_nbits;
+        pindex->pprev = tip;
+        tip = pindex.get();
+        chain.push_back(std::move(pindex));
+        t += T;
+    }
+    BOOST_REQUIRE_EQUAL(tip->nHeight, activation_height - 1);
+
+    const unsigned int powlimit_compact = UintToArith256(consensus.powLimit).GetCompact();
+
+    // The very first post-fork block: the exact call GetNextWorkRequired
+    // makes once pindexLast->nHeight + 1 == activation_height. mainnet has
+    // fPowAllowMinDifficultyBlocks=false, so the candidate block's own
+    // timestamp never actually matters here (the min-difficulty-blocks
+    // branch this feeds can't trigger) -- passed on schedule regardless,
+    // for a candidate that looks like a real one.
+    CBlockHeader candidate;
+    candidate.nTime = static_cast<uint32_t>(t);
+    unsigned int nbits = LwmaCalculateNextWorkRequired(tip, &candidate, consensus);
+    BOOST_CHECK(nbits != powlimit_compact);
+    {
+        arith_uint256 target;
+        target.SetCompact(nbits);
+        // Under perfectly on-schedule solvetimes, LWMA's weighted average
+        // reproduces the prevailing target almost exactly (mod small
+        // compact-rounding error): it must land close to the pre-fork
+        // difficulty, nowhere near powLimit.
+        BOOST_CHECK(target < classic_target * 2);
+        BOOST_CHECK(target > classic_target / 2);
+    }
+
+    // Keep mining on schedule for a while longer, past the point where the
+    // classic-DAA history has fully rolled out of the N=96 window, and
+    // check the difficulty stays put rather than drifting toward powLimit.
+    for (int i = 0; i < 20; ++i) {
+        auto pindex = std::make_unique<CBlockIndex>();
+        pindex->nHeight = tip->nHeight + 1;
+        pindex->nTime = static_cast<uint32_t>(t);
+        pindex->nBits = nbits;
+        pindex->pprev = tip;
+        tip = pindex.get();
+        chain.push_back(std::move(pindex));
+        t += T;
+
+        candidate.nTime = static_cast<uint32_t>(t);
+        nbits = LwmaCalculateNextWorkRequired(tip, &candidate, consensus);
+        BOOST_CHECK(nbits != powlimit_compact);
+        arith_uint256 target;
+        target.SetCompact(nbits);
+        BOOST_CHECK(target < classic_target * 2);
+        BOOST_CHECK(target > classic_target / 2);
+    }
 }
 
 BOOST_AUTO_TEST_CASE(CheckProofOfWork_test_negative_target)
