@@ -240,10 +240,18 @@ public:
         consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000017dde1c649f3708d14b6"};
         consensus.defaultAssumeValid = uint256{"000000007a61e4230b28ac5cb6b5e5a0130de37ac1faf2f8987d2fa6505b67f4"}; // 4842348
 
-        pchMessageStart[0] = 0x0b;
-        pchMessageStart[1] = 0x11;
-        pchMessageStart[2] = 0x09;
-        pchMessageStart[3] = 0x07;
+        // S256: was byte-for-byte identical to real Bitcoin testnet3's own
+        // magic bytes (0x0b110907) -- an S256 testnet node would complete a
+        // real P2P handshake with an actual Bitcoin testnet3 peer (network
+        // magic is checked before any block/chain data, so this held
+        // regardless of genesis/params differing). Chosen here to be
+        // clearly related to (but distinct from) S256 mainnet's own
+        // 0xf1c2a5d8, and to not collide with any real Bitcoin network
+        // (mainnet/testnet3/testnet4/regtest) or S256's own other chains.
+        pchMessageStart[0] = 0xf2;
+        pchMessageStart[1] = 0xc3;
+        pchMessageStart[2] = 0xa6;
+        pchMessageStart[3] = 0xd9;
         nDefaultPort = 18333;
         nPruneAfterHeight = 1000;
         m_assumed_blockchain_size = 245;
@@ -254,14 +262,15 @@ public:
         assert(consensus.hashGenesisBlock == uint256{"00000000aefbcde4f181e85661640a57d47e70c37cde02fff2b4e388e16754a9"});
         assert(genesis.hashMerkleRoot == uint256{"10eea688c8ea4279596b96394d3c234064c566f61aeeb41976fa379bc4500e65"});
 
+        // S256: these were real Bitcoin testnet3 DNS seed hostnames (Sjors
+        // Provoost, Jonas Schnelli, Peter Todd, Matt Corallo, Ava Chow's own
+        // infrastructure) -- an S256 testnet node would actively dial out to
+        // and attempt to sync from the real Bitcoin testnet3 network on
+        // every startup. Cleared until S256 has its own testnet seed
+        // infrastructure; add real S256-operated hostnames here once one
+        // exists, the same way CMainParams::vSeeds does for mainnet.
         vFixedSeeds.clear();
         vSeeds.clear();
-        // nodes with support for servicebits filtering should be at the top
-        vSeeds.emplace_back("testnet-seed.bitcoin.jonasschnelli.ch.");
-        vSeeds.emplace_back("seed.tbtc.petertodd.net.");
-        vSeeds.emplace_back("seed.testnet.bitcoin.sprovoost.nl.");
-        vSeeds.emplace_back("testnet-seed.bluematt.me."); // Just a static list of stable node(s), only supports x9
-        vSeeds.emplace_back("seed.testnet.achownodes.xyz."); // Ava Chow, only supports x1, x5, x9, x49, x809, x849, xd, x400, x404, x408, x448, xc08, xc48, x40c
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,196);
@@ -271,7 +280,12 @@ public:
 
         bech32_hrp = "ts2";
 
-        vFixedSeeds = std::vector<uint8_t>(std::begin(chainparams_seed_test), std::end(chainparams_seed_test));
+        // S256: chainparams_seed_test is real Bitcoin testnet3's own
+        // fixed-seed IP list (contrib/seeds output for the real network) --
+        // this used to silently repopulate vFixedSeeds with those real
+        // Bitcoin addresses right after clearing it above. Left empty until
+        // S256 has its own testnet fixed seeds to generate (see
+        // contrib/seeds/generate-seeds.py, same as CMainParams::vFixedSeeds).
 
         fDefaultConsistencyChecks = false;
         m_is_mockable_chain = false;
