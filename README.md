@@ -178,6 +178,13 @@ S256 alongside its own block, at no extra cost to its miners' hashrate.
 See `src/auxpow.h`/`src/auxpow.cpp` for the AuxPoW proof format and validation, and `src/rpc/mining.cpp`
 for the RPC implementation.
 
+## Pre-Fork Validation
+
+Before block 17,500 activates on mainnet, the AuxPoW/LWMA transition was rehearsed end-to-end on an
+isolated test chain — including a simulated hashrate drop and recovery, to check how LWMA's per-block
+difficulty adjustment responds when miners come and go. See the full report with charts:
+[public/test/lwma-transition-test.html](public/test/lwma-transition-test.html).
+
 ## Links
 
 - **Website:** https://sha256coin.eu/

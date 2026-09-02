@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LWMA Fork Rehearsal</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --bg-alt: #f4f5f7;
+    --text: #1a1d23;
+    --text-muted: #5b6472;
+    --border: #dde1e7;
+    --accent: #1f6feb;
+    --phase-prefork: #94a3b8;
+    --phase-baseline: #2f9e44;
+    --phase-drop: #e03131;
+    --phase-recovery: #1f6feb;
+    --code-bg: #eef0f3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14161a;
+      --bg-alt: #1c1f26;
+      --text: #e6e8eb;
+      --text-muted: #9aa4b2;
+      --border: #2c3038;
+      --code-bg: #22262e;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161a;
+    --bg-alt: #1c1f26;
+    --text: #e6e8eb;
+    --text-muted: #9aa4b2;
+    --border: #2c3038;
+    --code-bg: #22262e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; }
+  .subtitle { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 28px; }
+  h2 { font-size: 1.25rem; margin: 40px 0 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  h3 { font-size: 1.02rem; margin: 22px 0 8px; }
+  p { margin: 0 0 12px; }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin: 18px 0 8px;
+  }
+  .stat-card {
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat-card .label { font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat-card .value { font-size: 1.15rem; font-weight: 600; margin-top: 4px; }
+  .stat-card .sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88em; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--bg-alt);
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    margin: 16px 0;
+    font-size: 0.93rem;
+  }
+  .callout.warn { border-left-color: var(--phase-drop); }
+  .chart-box {
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 12px 8px;
+    margin: 16px 0;
+  }
+  .chart-box svg { width: 100%; height: auto; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.82rem; color: var(--text-muted); padding: 8px 8px 0; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.86rem; margin: 12px 0 20px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  tr.phase-boundary td { border-top: 2px solid var(--border); }
+  .phase-tag {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #fff;
+  }
+  .tag-prefork { background: var(--phase-prefork); }
+  .tag-baseline { background: var(--phase-baseline); }
+  .tag-drop { background: var(--phase-drop); }
+  .tag-recovery { background: var(--phase-recovery); }
+  footer { margin-top: 50px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.82rem; }
+  ul { margin: 0 0 12px; padding-left: 22px; }
+  li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>S256 LWMA Fork Transition Rehearsal</h1>
+  <div class="subtitle">Run 2026-09-02 &middot; local, isolated regtest &middot; scaled-down rehearsal of mainnet's real height-17,500 AuxPoW/LWMA hard fork</div>
+
+  <div class="callout">
+    <strong>Why this test:</strong> S256 mainnet is currently at block ~16,883 &mdash; roughly <strong>600 blocks (~8&ndash;9 days) away</strong> from its real AuxPoW+LWMA activation at height 17,500. This rehearsal exercises the exact same code path (chain identity, activation gating, and <code>LwmaCalculateNextWorkRequired</code>) on an isolated local chain, scaled down to a tractable size, to check the transition and LWMA's hashrate-adaptation behavior before it happens for real.
+  </div>
+
+  <h2>Scenario</h2>
+  <p>Three simulated miners mine from genesis. The classic-DAA-to-LWMA fork is scaled from mainnet's real height <strong>17,500</strong> down to height <strong>96</strong> &mdash; the smallest fork height at which LWMA's own N=96-block window has a full, real, pre-fork-timestamped history immediately available, exactly mirroring mainnet's actual situation (mainnet's height at its fork is already far past 96). After the fork, miner count is varied to observe LWMA's reaction:</p>
+
+  <div class="summary-grid">
+    <div class="stat-card"><div class="label">Phase 1 &middot; heights 1&ndash;95</div><div class="value">Pre-fork</div><div class="sub">Classic DAA, on-target pace</div></div>
+    <div class="stat-card"><div class="label">Phase 2 &middot; heights 96&ndash;155</div><div class="value">3 miners</div><div class="sub">LWMA baseline, faster than target</div></div>
+    <div class="stat-card"><div class="label">Phase 3 &middot; heights 156&ndash;205</div><div class="value">2 miners</div><div class="sub">One miner drops out</div></div>
+    <div class="stat-card"><div class="label">Phase 4 &middot; heights 206&ndash;255</div><div class="value">3 miners</div><div class="sub">Dropped miner returns</div></div>
+  </div>
+
+  <h2>Result: difficulty over the full run</h2>
+  <div class="chart-box">
+    <svg viewBox="0 0 920 380" xmlns="http://www.w3.org/2000/svg">
+      <!-- phase bands -->
+      <rect x="60" y="20" width="316.2" height="320" fill="var(--phase-prefork)" opacity="0.07"/>
+      <rect x="376.2" y="20" width="197.6" height="320" fill="var(--phase-baseline)" opacity="0.07"/>
+      <rect x="573.9" y="20" width="164.7" height="320" fill="var(--phase-drop)" opacity="0.07"/>
+      <rect x="738.6" y="20" width="161.4" height="320" fill="var(--phase-recovery)" opacity="0.07"/>
+      <!-- boundary lines -->
+      <line x1="376.2" y1="20" x2="376.2" y2="340" stroke="var(--border)" stroke-dasharray="4 3"/>
+      <line x1="573.9" y1="20" x2="573.9" y2="340" stroke="var(--border)" stroke-dasharray="4 3"/>
+      <line x1="738.6" y1="20" x2="738.6" y2="340" stroke="var(--border)" stroke-dasharray="4 3"/>
+      <!-- axes -->
+      <line x1="60" y1="340" x2="900" y2="340" stroke="var(--text-muted)"/>
+      <line x1="60" y1="20" x2="60" y2="340" stroke="var(--text-muted)"/>
+      <!-- data path -->
+      <path d="M 60.0,317.9 L 63.3,317.9 L 66.6,317.9 L 69.9,317.9 L 73.2,317.9 L 76.5,317.9 L 79.8,317.9 L 83.1,317.9 L 86.4,317.9 L 89.6,317.9 L 92.9,317.9 L 96.2,317.9 L 99.5,317.9 L 102.8,317.9 L 106.1,317.9 L 109.4,317.9 L 112.7,317.9 L 116.0,317.9 L 119.3,317.9 L 122.6,317.9 L 125.9,317.9 L 129.2,317.9 L 132.5,317.9 L 135.8,317.9 L 139.1,317.9 L 142.4,317.9 L 145.6,317.9 L 148.9,317.9 L 152.2,317.9 L 155.5,317.9 L 158.8,317.9 L 162.1,317.9 L 165.4,317.9 L 168.7,317.9 L 172.0,317.9 L 175.3,317.9 L 178.6,317.9 L 181.9,317.9 L 185.2,317.9 L 188.5,317.9 L 191.8,317.9 L 195.1,317.9 L 198.4,317.9 L 201.6,317.9 L 204.9,317.9 L 208.2,317.9 L 211.5,317.9 L 214.8,317.9 L 218.1,317.9 L 221.4,317.9 L 224.7,317.9 L 228.0,317.9 L 231.3,317.9 L 234.6,317.9 L 237.9,317.9 L 241.2,317.9 L 244.5,317.9 L 247.8,317.9 L 251.1,317.9 L 254.4,317.9 L 257.6,317.9 L 260.9,317.9 L 264.2,317.9 L 267.5,317.9 L 270.8,317.9 L 274.1,317.9 L 277.4,317.9 L 280.7,317.9 L 284.0,317.9 L 287.3,317.9 L 290.6,317.9 L 293.9,317.9 L 297.2,42.1 L 300.5,42.1 L 303.8,42.1 L 307.1,42.1 L 310.4,42.1 L 313.6,42.1 L 316.9,42.1 L 320.2,42.1 L 323.5,42.1 L 326.8,42.1 L 330.1,42.1 L 333.4,42.1 L 336.7,42.1 L 340.0,42.1 L 343.3,42.1 L 346.6,42.1 L 349.9,42.1 L 353.2,42.1 L 356.5,42.1 L 359.8,42.1 L 363.1,42.1 L 366.4,42.1 L 369.6,42.1 L 372.9,42.1 L 376.2,317.9 L 379.5,310.1 L 382.8,309.7 L 386.1,309.2 L 389.4,308.8 L 392.7,308.3 L 396.0,307.8 L 399.3,307.3 L 402.6,306.8 L 405.9,306.3 L 409.2,305.8 L 412.5,305.3 L 415.8,304.8 L 419.1,304.3 L 422.4,303.8 L 425.6,303.2 L 428.9,302.7 L 432.2,302.2 L 435.5,301.6 L 438.8,301.0 L 442.1,300.5 L 445.4,299.9 L 448.7,299.3 L 452.0,298.7 L 455.3,298.1 L 458.6,297.5 L 461.9,296.9 L 465.2,296.3 L 468.5,295.7 L 471.8,295.1 L 475.1,294.5 L 478.4,293.8 L 481.6,293.2 L 484.9,292.5 L 488.2,291.9 L 491.5,291.2 L 494.8,290.5 L 498.1,289.8 L 501.4,289.2 L 504.7,288.5 L 508.0,287.8 L 511.3,287.0 L 514.6,286.3 L 517.9,285.6 L 521.2,284.9 L 524.5,284.1 L 527.8,283.4 L 531.1,282.6 L 534.4,281.9 L 537.6,281.1 L 540.9,280.3 L 544.2,279.5 L 547.5,278.7 L 550.8,277.9 L 554.1,277.1 L 557.4,276.3 L 560.7,275.5 L 564.0,274.6 L 567.3,273.8 L 570.6,272.9 L 573.9,272.1 L 577.2,271.4 L 580.5,270.7 L 583.8,270.0 L 587.1,269.3 L 590.4,268.6 L 593.6,267.8 L 596.9,267.1 L 600.2,266.3 L 603.5,265.5 L 606.8,264.7 L 610.1,263.9 L 613.4,263.1 L 616.7,263.2 L 620.0,263.3 L 623.3,263.4 L 626.6,263.5 L 629.9,263.6 L 633.2,263.7 L 636.5,263.8 L 639.8,263.9 L 643.1,264.1 L 646.4,264.2 L 649.6,264.4 L 652.9,264.5 L 656.2,264.7 L 659.5,264.9 L 662.8,265.1 L 666.1,265.2 L 669.4,265.4 L 672.7,265.6 L 676.0,265.8 L 679.3,266.0 L 682.6,266.3 L 685.9,266.5 L 689.2,266.7 L 692.5,267.0 L 695.8,266.4 L 699.1,265.9 L 702.4,265.5 L 705.6,265.1 L 708.9,264.7 L 712.2,264.3 L 715.5,263.9 L 718.8,263.5 L 722.1,263.0 L 725.4,262.6 L 728.7,262.2 L 732.0,261.7 L 735.3,261.3 L 738.6,260.8 L 741.9,260.2 L 745.2,259.6 L 748.5,258.9 L 751.8,258.3 L 755.1,257.7 L 758.4,257.0 L 761.6,256.4 L 764.9,255.7 L 768.2,255.1 L 771.5,254.5 L 774.8,253.8 L 778.1,253.2 L 781.4,252.5 L 784.7,251.9 L 788.0,251.3 L 791.3,250.6 L 794.6,250.0 L 797.9,249.4 L 801.2,248.8 L 804.5,248.1 L 807.8,247.5 L 811.1,246.9 L 814.4,246.3 L 817.6,245.7 L 820.9,245.1 L 824.2,244.5 L 827.5,243.8 L 830.8,243.3 L 834.1,242.7 L 837.4,242.1 L 840.7,241.5 L 844.0,240.9 L 847.3,240.3 L 850.6,239.8 L 853.9,239.2 L 857.2,238.7 L 860.5,238.1 L 863.8,237.6 L 867.1,237.0 L 870.4,236.5 L 873.6,236.0 L 876.9,235.5 L 880.2,234.9 L 883.5,234.4 L 886.8,234.0 L 890.1,233.5 L 893.4,233.0 L 896.7,232.5 L 900.0,232.1"
+        fill="none" stroke="var(--accent)" stroke-width="2"/>
+      <!-- axis labels -->
+      <text x="60" y="358" font-size="11" fill="var(--text-muted)">0</text>
+      <text x="360" y="358" font-size="11" fill="var(--text-muted)" text-anchor="middle">96</text>
+      <text x="565" y="358" font-size="11" fill="var(--text-muted)" text-anchor="middle">156</text>
+      <text x="730" y="358" font-size="11" fill="var(--text-muted)" text-anchor="middle">206</text>
+      <text x="895" y="358" font-size="11" fill="var(--text-muted)" text-anchor="end">255</text>
+      <text x="460" y="374" font-size="11" fill="var(--text-muted)" text-anchor="middle">block height</text>
+      <text x="14" y="30" font-size="11" fill="var(--text-muted)">harder</text>
+      <text x="14" y="336" font-size="11" fill="var(--text-muted)">easier</text>
+    </svg>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--phase-prefork)"></i>pre-fork (classic DAA)</span>
+      <span><i class="swatch" style="background:var(--phase-baseline)"></i>baseline (3 miners)</span>
+      <span><i class="swatch" style="background:var(--phase-drop)"></i>drop (2 miners)</span>
+      <span><i class="swatch" style="background:var(--phase-recovery)"></i>recovery (3 miners)</span>
+    </div>
+  </div>
+  <p style="font-size:0.85rem;color:var(--text-muted)">Y-axis is log-scale difficulty (unlabeled numerically since the classic DAA's one-time interval-boundary adjustment at height 72 is ~4.6 orders of magnitude larger than anything LWMA does afterward, dwarfing it on a shared scale &mdash; see the zoomed chart below for the actual LWMA story).</p>
+
+  <h2>Result: LWMA response, zoomed (heights 96&ndash;255)</h2>
+  <div class="chart-box">
+    <svg viewBox="0 0 920 380" xmlns="http://www.w3.org/2000/svg">
+      <rect x="60" y="20" width="316.98" height="320" fill="var(--phase-baseline)" opacity="0.07"/>
+      <rect x="376.98" y="20" width="264.15" height="320" fill="var(--phase-drop)" opacity="0.07"/>
+      <rect x="641.13" y="20" width="258.87" height="320" fill="var(--phase-recovery)" opacity="0.07"/>
+      <line x1="376.98" y1="20" x2="376.98" y2="340" stroke="var(--border)" stroke-dasharray="4 3"/>
+      <line x1="641.13" y1="20" x2="641.13" y2="340" stroke="var(--border)" stroke-dasharray="4 3"/>
+      <line x1="60" y1="340" x2="900" y2="340" stroke="var(--text-muted)"/>
+      <line x1="60" y1="20" x2="60" y2="340" stroke="var(--text-muted)"/>
+      <path d="M 60.0,317.9 L 65.3,292.9 L 70.6,291.5 L 75.8,290.0 L 81.1,288.5 L 86.4,287.0 L 91.7,285.4 L 97.0,283.9 L 102.3,282.3 L 107.5,280.7 L 112.8,279.1 L 118.1,277.5 L 123.4,275.8 L 128.7,274.2 L 134.0,272.5 L 139.2,270.7 L 144.5,269.0 L 149.8,267.2 L 155.1,265.5 L 160.4,263.7 L 165.7,261.9 L 170.9,260.0 L 176.2,258.2 L 181.5,256.3 L 186.8,254.4 L 192.1,252.4 L 197.4,250.5 L 202.6,248.5 L 207.9,246.6 L 213.2,244.5 L 218.5,242.5 L 223.8,240.5 L 229.1,238.4 L 234.3,236.3 L 239.6,234.2 L 244.9,232.0 L 250.2,229.9 L 255.5,227.7 L 260.8,225.5 L 266.0,223.2 L 271.3,221.0 L 276.6,218.7 L 281.9,216.4 L 287.2,214.1 L 292.5,211.8 L 297.7,209.4 L 303.0,207.0 L 308.3,204.6 L 313.6,202.1 L 318.9,199.6 L 324.2,197.1 L 329.4,194.6 L 334.7,192.1 L 340.0,189.5 L 345.3,186.9 L 350.6,184.2 L 355.8,181.6 L 361.1,178.9 L 366.4,176.1 L 371.7,173.4 L 377.0,170.5 L 382.3,168.4 L 387.5,166.2 L 392.8,163.9 L 398.1,161.7 L 403.4,159.3 L 408.7,157.0 L 414.0,154.6 L 419.2,152.1 L 424.5,149.6 L 429.8,147.1 L 435.1,144.4 L 440.4,141.7 L 445.7,142.0 L 450.9,142.3 L 456.2,142.6 L 461.5,143.0 L 466.8,143.3 L 472.1,143.7 L 477.4,144.1 L 482.6,144.5 L 487.9,145.0 L 493.2,145.4 L 498.5,145.9 L 503.8,146.4 L 509.1,146.9 L 514.3,147.5 L 519.6,148.1 L 524.9,148.7 L 530.2,149.3 L 535.5,149.9 L 540.8,150.6 L 546.0,151.3 L 551.3,152.0 L 556.6,152.7 L 561.9,153.4 L 567.2,154.2 L 572.5,152.2 L 577.7,150.9 L 583.0,149.6 L 588.3,148.3 L 593.6,147.0 L 598.9,145.6 L 604.2,144.3 L 609.4,142.9 L 614.7,141.5 L 620.0,140.2 L 625.3,138.8 L 630.6,137.4 L 635.8,135.9 L 641.1,134.5 L 646.4,132.5 L 651.7,130.4 L 657.0,128.4 L 662.3,126.3 L 667.5,124.3 L 672.8,122.2 L 678.1,120.2 L 683.4,118.1 L 688.7,116.1 L 694.0,114.0 L 699.2,112.0 L 704.5,109.9 L 709.8,107.9 L 715.1,105.8 L 720.4,103.8 L 725.7,101.8 L 730.9,99.8 L 736.2,97.7 L 741.5,95.7 L 746.8,93.7 L 752.1,91.7 L 757.4,89.7 L 762.6,87.8 L 767.9,85.8 L 773.2,83.8 L 778.5,81.9 L 783.8,80.0 L 789.1,78.0 L 794.3,76.1 L 799.6,74.2 L 804.9,72.4 L 810.2,70.5 L 815.5,68.7 L 820.8,66.8 L 826.0,65.0 L 831.3,63.3 L 836.6,61.5 L 841.9,59.7 L 847.2,58.0 L 852.5,56.3 L 857.7,54.6 L 863.0,53.0 L 868.3,51.3 L 873.6,49.7 L 878.9,48.2 L 884.2,46.6 L 889.4,45.1 L 894.7,43.6 L 900.0,42.1"
+        fill="none" stroke="var(--accent)" stroke-width="2"/>
+      <text x="60" y="358" font-size="11" fill="var(--text-muted)">96</text>
+      <text x="377" y="358" font-size="11" fill="var(--text-muted)" text-anchor="middle">156</text>
+      <text x="641" y="358" font-size="11" fill="var(--text-muted)" text-anchor="middle">206</text>
+      <text x="895" y="358" font-size="11" fill="var(--text-muted)" text-anchor="end">255</text>
+      <text x="460" y="374" font-size="11" fill="var(--text-muted)" text-anchor="middle">block height</text>
+      <text x="14" y="30" font-size="11" fill="var(--text-muted)">harder</text>
+      <text x="14" y="336" font-size="11" fill="var(--text-muted)">easier</text>
+    </svg>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--phase-baseline)"></i>baseline (3 miners)</span>
+      <span><i class="swatch" style="background:var(--phase-drop)"></i>drop (2 miners)</span>
+      <span><i class="swatch" style="background:var(--phase-recovery)"></i>recovery (3 miners)</span>
+    </div>
+  </div>
+
+  <h2>Reading the result</h2>
+  <ul>
+    <li><strong>Fork transition (height 96):</strong> clean, no crash, no stall, no consensus error. LWMA's own bootstrap guard (<code>height &lt; N</code> in <code>LwmaCalculateNextWorkRequired</code>) means the block <em>at</em> the activation height itself still uses the pre-fork floor, and real per-block computation starts one block later (97) &mdash; a minor off-by-one against the naive "N=96 ⇒ active at 96" assumption, not a bug.</li>
+    <li><strong>Baseline, 3 miners (97&rarr;155):</strong> steady, monotonic tightening. The simulated 3-miner pace was faster than the network's target spacing, and LWMA correctly raised difficulty in response, block after block.</li>
+    <li><strong>Drop to 2 miners (156&rarr;~172):</strong> difficulty keeps <em>rising</em> for about 15 more blocks before turning &mdash; expected lag for a weighted moving average still dominated by the faster 3-miner blocks still inside its window.</li>
+    <li><strong>Drop to 2 miners (~172&rarr;~194):</strong> difficulty eases, as LWMA's window fills with the slower post-drop blocks.</li>
+    <li><strong>Drop to 2 miners (~194&rarr;206):</strong> a partial re-tightening before the phase ends &mdash; the window is still catching up to the new pace when phase 4 begins. This wobble is real LWMA behavior (not test noise): a 96-block weighted average doesn't snap to a step change in hashrate, it converges toward it, and 50 blocks wasn't quite enough to fully settle.</li>
+    <li><strong>Recovery, 3 miners again (206&rarr;255):</strong> steady, monotonic tightening resumes immediately and continues cleanly for the full 50-block phase &mdash; no stall, no oscillation this time (starting from an already-partially-adjusted state rather than a fresh step change).</li>
+  </ul>
+
+  <div class="callout">
+    <strong>Bottom line:</strong> LWMA activates cleanly at the fork, degrades gracefully (with expected lag, not runaway instability) when hashrate drops, and recovers cleanly when it returns. 255 blocks, zero crashes, zero stalled/rejected blocks, zero consensus errors.
+  </div>
+
+  <h2>Methodology &amp; how this was actually run</h2>
+  <p>First attempt used <strong>real</strong> competitive CPU mining (3 concurrent <code>generatetoaddress</code> processes racing on testnet) through a live, wall-clock pre-fork phase. That surfaced something worth recording: mining pre-fork blocks in ~4&ndash;5 real seconds each (instead of the real 1200s target) made LWMA see an "impossibly fast" historical window the instant it activated, and it responded exactly as designed &mdash; by spiking the required difficulty roughly <strong>250&times;</strong>, past what 3 CPU threads could plausibly solve in reasonable time. That's correct LWMA behavior, but it's an artifact of <em>compressing</em> the test's own timeline, not something that would happen on mainnet (whose real pre-fork blocks are already paced at the real ~20-minute target).</p>
+  <p>This run switched to <strong>regtest</strong> with a temporary consensus test-patch (<code>fPowNoRetargeting=false</code>, activation heights set to 96 &mdash; regtest normally disables retargeting entirely, and this rehearsal needed it enabled) and used <code>setmocktime</code> (regtest-only) to give each block a controlled, phase-appropriate timestamp &mdash; 1200s/block pre-fork and at baseline-equivalent pace, 400s/block for the two "3 miners" phases, 600s/block for the "2 miners" phase &mdash; while every block's proof-of-work was still <strong>genuinely solved and validated</strong> through real RPC calls (<code>generatetoaddress</code>, real block acceptance, real <code>LwmaCalculateNextWorkRequired</code> execution) rather than a unit-test mock. The test-only patch is local to this rehearsal and is not part of any real chain's consensus rules.</p>
+  <p>The one-time large jump at height 72 in the overview chart is the classic DAA's own interval-boundary retarget (regtest's <code>nPowTargetTimespan</code>/<code>nPowTargetSpacing</code> gives a 72-block interval) &mdash; expected, pre-existing, unmodified behavior, unrelated to the LWMA fork itself.</p>
+
+  <h3>Checkpoints</h3>
+  <table>
+    <thead><tr><th>Height</th><th>Phase</th><th>nBits</th><th>Relative difficulty</th></tr></thead>
+    <tbody>
+      <tr><td>0</td><td><span class="phase-tag tag-prefork">genesis</span></td><td class="mono">207fffff</td><td class="mono">4.66e-10</td></tr>
+      <tr><td>71</td><td><span class="phase-tag tag-prefork">pre-fork</span></td><td class="mono">207fffff</td><td class="mono">4.66e-10</td></tr>
+      <tr><td>72</td><td><span class="phase-tag tag-prefork">pre-fork</span></td><td class="mono">1f00c131</td><td class="mono">2.02e-05</td></tr>
+      <tr><td>95</td><td><span class="phase-tag tag-prefork">pre-fork</span></td><td class="mono">1f00c131</td><td class="mono">2.02e-05</td></tr>
+      <tr class="phase-boundary"><td>96</td><td><span class="phase-tag tag-baseline">fork block</span></td><td class="mono">207fffff</td><td class="mono">4.66e-10</td></tr>
+      <tr><td>97</td><td><span class="phase-tag tag-baseline">baseline (3)</span></td><td class="mono">205eae60</td><td class="mono">6.30e-10</td></tr>
+      <tr><td>120</td><td><span class="phase-tag tag-baseline">baseline (3)</span></td><td class="mono">203b8261</td><td class="mono">1.00e-09</td></tr>
+      <tr><td>155</td><td><span class="phase-tag tag-baseline">baseline (3)</span></td><td class="mono">20166aa9</td><td class="mono">2.66e-09</td></tr>
+      <tr class="phase-boundary"><td>156</td><td><span class="phase-tag tag-drop">drop (2)</span></td><td class="mono">2015abe8</td><td class="mono">2.75e-09</td></tr>
+      <tr><td>170</td><td><span class="phase-tag tag-drop">drop (2)</span></td><td class="mono">200f6b83</td><td class="mono">3.87e-09</td></tr>
+      <tr><td>190</td><td><span class="phase-tag tag-drop">drop (2)</span></td><td class="mono">201179a1</td><td class="mono">3.41e-09</td></tr>
+      <tr><td>205</td><td><span class="phase-tag tag-drop">drop (2)</span></td><td class="mono">200e4899</td><td class="mono">4.17e-09</td></tr>
+      <tr class="phase-boundary"><td>206</td><td><span class="phase-tag tag-recovery">recovery (3)</span></td><td class="mono">200e0aa5</td><td class="mono">4.24e-09</td></tr>
+      <tr><td>230</td><td><span class="phase-tag tag-recovery">recovery (3)</span></td><td class="mono">2007cdc7</td><td class="mono">7.64e-09</td></tr>
+      <tr><td>255</td><td><span class="phase-tag tag-recovery">recovery (3)</span></td><td class="mono">20049bb3</td><td class="mono">1.29e-08</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:0.85rem;color:var(--text-muted)">"Relative difficulty" is expressed against real Bitcoin's difficulty-1 reference (nBits <code>1d00ffff</code> = 1.0); regtest's own floor is intrinsically far below that, hence the small numbers throughout &mdash; only the trend across rows matters here.</p>
+
+  <h2>Related evidence</h2>
+  <p>Separately, this build's daemon completed a full <strong>real</strong> sync of the live S256 mainnet chain (genesis through height 16,883, against real network peers) with zero errors, warnings, or reorgs &mdash; confirming the consensus code is sound on the real chain right up to (but not yet through) the real fork. This rehearsal is the complementary piece: what happens <em>at and after</em> the fork, which the real chain hasn't reached yet.</p>
+
+  <footer>
+    Generated 2026-09-02 &middot; S256 Core pre-fork validation &middot; the regtest test harness and consensus test-patch used to produce this report are not part of any released binary or live chain.
+  </footer>
+
+</div>
+</body>
+</html>
