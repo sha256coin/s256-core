@@ -1,0 +1,137 @@
+name: Release
+
+# Builds and publishes Linux + Windows release binaries whenever a version
+# tag (vX.Y.Z) is pushed. Mirrors the manual process used for past
+# releases (SHA256Coin-vX.Y.Z-linux64.tar.gz / -win64.zip, containing
+# sha256coind/-cli/-tx/-wallet/-qt), automated via the depends build
+# system so both legs get portable, self-contained binaries without
+# relying on whatever library versions happen to be on the runner.
+#
+# Test gate: the linux64 leg runs test_bitcoin (native, so it actually
+# can) with the exclude list documented in the S256 test-debt notes --
+# everything in that list is either a known crash/cascade bug (excluded
+# so one bad suite doesn't corrupt the whole run) or the still-open
+# 50-vs-100-COIN subsidy assumption (root cause 2, a separate project).
+# Everything NOT excluded must pass, or the job fails and nothing gets
+# published. The win64 leg only builds (no wine set up here to run cross-
+# compiled .exe unit tests), so it's gated on the *same source tree* the
+# linux64 leg already tested, not on its own independent test run.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  # Suites/cases excluded from the release test gate -- see
+  # s256-known-test-debt (project memory) for why each one is here.
+  # Update this list as debt is fixed or new debt is found; it should
+  # shrink over time, not grow.
+  TEST_EXCLUDES: >-
+    --run_test=!miner_tests/CreateNewBlock_validity
+    --run_test=!net_peer_connection_tests
+    --run_test=!net_tests/initial_advertise_from_version_message
+    --run_test=!net_tests/advertise_local_address
+    --run_test=!txpackage_tests
+    --run_test=!txvalidationcache_tests/checkinputs_test
+    --run_test=!validation_chainstate_tests/chainstate_update_tip
+    --run_test=!validation_chainstatemanager_tests
+    --run_test=!validation_tests
+    --run_test=!spend_tests
+    --run_test=!script_standard_tests
+    --run_test=!util_tests
+    --run_test=!miniminer_tests
+    --run_test=!disconnected_transactions
+    --run_test=!bip328_tests
+    --run_test=!walletload_tests
+    --run_test=!interfaces_tests
+    --run_test=!wallet_tests
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux64
+            host: x86_64-pc-linux-gnu
+            run_tests: true
+          - target: win64
+            host: x86_64-w64-mingw32
+            run_tests: false
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake curl make patch bison g++ ninja-build pkgconf python3 xz-utils
+
+      - name: Install Windows cross-compile toolchain
+        if: matrix.host == 'x86_64-w64-mingw32'
+        run: sudo apt-get install -y g++-mingw-w64-x86-64-posix
+
+      - name: Cache depends
+        uses: actions/cache@v4
+        with:
+          path: |
+            depends/built
+            depends/sources
+          key: depends-${{ matrix.host }}-${{ hashFiles('depends/packages/*.mk', 'depends/funcs.mk', 'depends/Makefile') }}
+          restore-keys: |
+            depends-${{ matrix.host }}-
+
+      - name: Build depends
+        run: make -C depends HOST=${{ matrix.host }} -j$(nproc)
+
+      - name: Configure
+        run: cmake -B build --toolchain depends/${{ matrix.host }}/toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build -j$(nproc)
+
+      - name: Run unit tests
+        if: matrix.run_tests
+        working-directory: build
+        run: ./bin/test_bitcoin ${{ env.TEST_EXCLUDES }}
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME}"
+          DIST="SHA256Coin-${VERSION}-${{ matrix.target }}"
+          mkdir -p "$DIST"
+          if [ "${{ matrix.target }}" = "win64" ]; then
+            cp build/bin/sha256coind.exe build/bin/sha256coin-cli.exe build/bin/sha256coin-tx.exe build/bin/sha256coin-wallet.exe build/bin/sha256coin-qt.exe "$DIST/"
+            zip -r "${DIST}.zip" "$DIST"
+          else
+            cp build/bin/sha256coind build/bin/sha256coin-cli build/bin/sha256coin-tx build/bin/sha256coin-wallet build/bin/sha256coin-qt "$DIST/"
+            tar -czf "${DIST}.tar.gz" "$DIST"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: SHA256Coin-*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

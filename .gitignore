@@ -26,6 +26,9 @@
 # Previous releases
 /releases
 
+# Local release-packaging output (built binaries/archives, not source)
+/dist
+
 # cargo default target dir
 target/
 
