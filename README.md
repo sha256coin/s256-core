@@ -8,7 +8,18 @@ S256 Core - Digital Platinum
 
 S256 is a Bitcoin fork that takes the contrarian approach: **"Double the Work, Double the Value"**
 
-Based on Bitcoin Core v30.0, S256 doubles key parameters for increased scarcity and deliberation:
+Based on Bitcoin Core v31.1, S256 doubles key parameters for increased scarcity and deliberation:
+
+## What's New in v2.2.0
+
+Rebased onto upstream **Bitcoin Core v31.1** (from v30.0), carrying forward roughly a year and a half of upstream fixes and improvements, plus:
+
+- **Testnet fixes** — testnet3 and testnet4 nodes were silently connecting to the *real* Bitcoin test networks instead of S256's own (unmodified network magic bytes and DNS/fixed seeds inherited from upstream); both are now properly isolated on their own network identity, with freshly mined genesis blocks and working difficulty adjustment.
+- **Fixed a persistent sync warning** — "unknown new rules activated (versionbit 2)" no longer appears in bitcoin-qt or the daemon after every sync.
+- **Critical fix caught before it could ship** — this rebase briefly introduced a bug that would have crashed every node on its very first sync (a missing anti-DoS parameter for header synchronization); found via a live sync test against real mainnet peers, fixed, and re-verified before release. It was never active on any released version.
+- **Pre-fork validation** — rehearsed the upcoming AuxPoW/LWMA transition at block 17,500 end to end, including a simulated hashrate drop and recovery, to check LWMA's difficulty response before the real fork happens. See [Pre-Fork Validation](#pre-fork-validation) below.
+- **Automated releases** — tagged releases now build and publish Linux and Windows binaries automatically.
+- Substantially hardened unit test coverage across key encoding, descriptors, and the P2P transport layer.
 
 ## What's New in v2.0.1
 
@@ -183,7 +194,10 @@ for the RPC implementation.
 Before block 17,500 activates on mainnet, the AuxPoW/LWMA transition was rehearsed end-to-end on an
 isolated test chain — including a simulated hashrate drop and recovery, to check how LWMA's per-block
 difficulty adjustment responds when miners come and go. See the full report with charts:
-[public/test/lwma-transition-test.html](public/test/lwma-transition-test.html).
+
+**https://sha256coin.github.io/s256-core/test/lwma-transition-test.html**
+
+(source: [public/test/lwma-transition-test.html](public/test/lwma-transition-test.html))
 
 ## Links
 
@@ -214,7 +228,7 @@ S256 Core is released under the terms of the MIT license. See [COPYING](COPYING)
 
 ## Development
 
-S256 is based on Bitcoin Core v30.0 and maintains compatibility with Bitcoin's proven codebase while implementing the 2x parameter modifications.
+S256 is based on Bitcoin Core v31.1 and maintains compatibility with Bitcoin's proven codebase while implementing the 2x parameter modifications.
 
 For technical details on the modifications, see the documentation in the `/doc` folder.
 
