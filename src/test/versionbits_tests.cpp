@@ -500,4 +500,58 @@ BOOST_AUTO_TEST_CASE(versionbits_auxpow_bit_reserved)
     }
 }
 
+/* S256: guard against the "unknown new rules activated (versionbit 2)"
+ * warning that permanently appeared in both bitcoin-qt and the daemon
+ * after every sync (see versionbit_change.txt). Root cause:
+ * DEPLOYMENT_TAPROOT was a real BIP9 STARTED deployment on bit 2 from
+ * genesis until it was switched to ALWAYS_ACTIVE around block 4012, so
+ * blocks 1 through ~4011 permanently carry bit 2 set in their immutable
+ * headers. WarningBitsConditionChecker (versionbits.cpp) tallies every
+ * block's actual nVersion against what ComputeBlockVersion() would set
+ * today in rolling 2016-block windows (hardcoded for mainnet, regardless
+ * of this chain's own ~1008-block DAA interval); the pre-fix history was
+ * >=90% "contaminated" for every window up through the one containing
+ * ~4012, which -- because BIP9 states only ratchet forward, never revert
+ * -- permanently mislatched bit 2 to LOCKED_IN then ACTIVE. The fix moved
+ * consensus.MinBIP9WarningHeight past that contaminated history (to 4032,
+ * the first clean period boundary) so none of those blocks are ever
+ * tallied. This test builds exactly that historical shape and confirms
+ * the real, current mainnet params no longer flag bit 2.
+ */
+BOOST_AUTO_TEST_CASE(versionbits_no_warning_from_pre_fix_taproot_signaling)
+{
+    ArgsManager args;
+    const auto chainParams = CreateChainParams(args, ChainType::MAIN);
+    const Consensus::Params& consensus = chainParams->GetConsensus();
+    BOOST_REQUIRE(consensus.MinBIP9WarningHeight > 4012); // the actual fix
+
+    // Build a chain past several 2016-block warning-checker windows: blocks
+    // 1..4011 signal bit 2 (the pre-fix STARTED-Taproot era), 4012 onward
+    // don't (matching ComputeBlockVersion() under today's ALWAYS_ACTIVE
+    // config) -- same shape as the real chain history.
+    constexpr int32_t contaminated_version = VERSIONBITS_TOP_BITS | (1 << 2);
+    constexpr int32_t clean_version = VERSIONBITS_TOP_BITS;
+    constexpr int fix_height = 4012;
+    constexpr int tip_height = 6100; // past the first fully-clean period boundary (4032)
+
+    std::vector<std::unique_ptr<CBlockIndex>> chain;
+    CBlockIndex* tip = nullptr;
+    for (int h = 0; h <= tip_height; ++h) {
+        auto pindex = std::make_unique<CBlockIndex>();
+        pindex->nHeight = h;
+        pindex->nVersion = (h > 0 && h < fix_height) ? contaminated_version : clean_version;
+        pindex->pprev = tip;
+        tip = pindex.get();
+        chain.push_back(std::move(pindex));
+    }
+
+    VersionBitsCache cache;
+    const auto unknown = cache.CheckUnknownActivations(tip, *chainParams);
+    for (const auto& [bit, is_active] : unknown) {
+        BOOST_CHECK_MESSAGE(bit != 2,
+                             "bit 2 flagged as unknown-activation (is_active=" << is_active
+                                 << ") -- pre-fix Taproot signaling history is leaking through again");
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

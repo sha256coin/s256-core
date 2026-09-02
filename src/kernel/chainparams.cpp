@@ -90,7 +90,29 @@ public:
         consensus.BIP66Height = 1626; // S256: Activated at block 1626 (strict DER signatures)
         consensus.CSVHeight = 1626; // S256: Activated at block 1626 (CHECKSEQUENCEVERIFY)
         consensus.SegwitHeight = 1626; // S256: Activated at block 1626 (SegWit/witness data)
-        consensus.MinBIP9WarningHeight = 2016; // S256: First difficulty adjustment period
+        // S256: gates WarningBitsConditionChecker (versionbits.cpp), the
+        // "unknown new rules activated (versionbit N)" warning -- it scans
+        // every block's actual nVersion in rolling 2016-block windows
+        // (hardcoded for mainnet by that checker, independent of this
+        // chain's own ~1008-block DAA interval) against what
+        // ComputeBlockVersion() would set today, and once 90% of a window
+        // disagrees it latches LOCKED_IN then ACTIVE -- permanently, since
+        // BIP9 states never revert. Blocks 1 through ~4012 were mined
+        // while DEPLOYMENT_TAPROOT was still a real (buggy, see
+        // versionbit_change.txt) BIP9 STARTED deployment on bit 2, so they
+        // permanently carry bit 2 set in their immutable headers even
+        // though Taproot has been ALWAYS_ACTIVE (no signaling) since the
+        // fix. Left at the pre-fix default of 2016, the very first
+        // 2016-block window it evaluates (and every window up through the
+        // one containing ~4012) is >=90% "contaminated" by that history,
+        // permanently mislatching bit 2's warning state -- exactly the
+        // "unknown new rules activated (versionbit 2)" banner reported in
+        // both bitcoin-qt and the daemon after every sync, regardless of
+        // how many clean (bit-2-clear) blocks get mined afterward. Moved
+        // past 4032 (the first 2016-block period boundary after the fix,
+        // i.e. the first window wholly free of pre-fix history) so the
+        // checker never tallies any pre-fix block for any deployment.
+        consensus.MinBIP9WarningHeight = 4032;
         // S256: AuxPoW (merged mining) + LWMA difficulty adjustment hard fork,
         // bundled into one coordinated upgrade. Chosen ahead of the tip
         // (~16,808 at the time this was set) to give both existing pool
