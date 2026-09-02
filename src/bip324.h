@@ -12,6 +12,7 @@
 #include <crypto/chacha20.h>
 #include <crypto/chacha20poly1305.h>
 #include <key.h>
+#include <kernel/messagestartchars.h>
 #include <pubkey.h>
 #include <span.h>
 
@@ -58,8 +59,14 @@ public:
      * initiator is set to true if we are the initiator establishing the v2 P2P connection.
      * self_decrypt is only for testing, and swaps encryption/decryption keys, so that encryption
      * and decryption can be tested without knowing the other side's private key.
+     * netmagic_override is only for testing: the real BIP324 salt is network-magic-dependent
+     * (see Initialize()'s definition) by protocol design, so verifying this implementation
+     * against upstream's official cross-implementation test vectors -- which were computed
+     * against real Bitcoin's own mainnet magic bytes, not this chain's -- needs a way to supply
+     * that magic explicitly rather than reading whatever chain happens to be currently selected.
      */
-    void Initialize(const EllSwiftPubKey& their_pubkey, bool initiator, bool self_decrypt = false) noexcept;
+    void Initialize(const EllSwiftPubKey& their_pubkey, bool initiator, bool self_decrypt = false,
+                     std::optional<MessageStartChars> netmagic_override = std::nullopt) noexcept;
 
     /** Determine whether this cipher is fully initialized. */
     explicit operator bool() const noexcept { return m_send_l_cipher.has_value(); }

@@ -57,10 +57,16 @@ void TestBIP324PacketVector(
     EllSwiftPubKey ellswift_theirs(in_ellswift_theirs);
 
     // Instantiate encryption BIP324 cipher.
+    // S256: these are upstream's official cross-implementation BIP324 test vectors, computed
+    // against real Bitcoin's own mainnet network magic (the salt is network-magic-dependent by
+    // protocol design, see BIP324Cipher::Initialize's definition) -- pass it explicitly rather
+    // than whatever chain happens to be currently selected, so this test verifies the cipher
+    // implementation itself against the spec vectors regardless of this chain's own magic bytes.
+    static constexpr MessageStartChars REAL_BITCOIN_MAINNET_MAGIC{0xf9, 0xbe, 0xb4, 0xd9};
     BIP324Cipher cipher(key, ellswift_ours);
     BOOST_CHECK(!cipher);
     BOOST_CHECK(cipher.GetOurPubKey() == ellswift_ours);
-    cipher.Initialize(ellswift_theirs, in_initiating);
+    cipher.Initialize(ellswift_theirs, in_initiating, /*self_decrypt=*/false, REAL_BITCOIN_MAINNET_MAGIC);
     BOOST_CHECK(cipher);
 
     // Compare session variables.
@@ -107,7 +113,7 @@ void TestBIP324PacketVector(
         BIP324Cipher dec_cipher(key, ellswift_ours);
         BOOST_CHECK(!dec_cipher);
         BOOST_CHECK(dec_cipher.GetOurPubKey() == ellswift_ours);
-        dec_cipher.Initialize(ellswift_theirs, (error == 1) ^ in_initiating, /*self_decrypt=*/true);
+        dec_cipher.Initialize(ellswift_theirs, (error == 1) ^ in_initiating, /*self_decrypt=*/true, REAL_BITCOIN_MAINNET_MAGIC);
         BOOST_CHECK(dec_cipher);
 
         // Compare session variables.
