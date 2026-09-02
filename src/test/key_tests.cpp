@@ -24,15 +24,25 @@
 using namespace util::hex_literals;
 using util::ToString;
 
-static const std::string strSecret1 = "5HxWvvfubhXpYYpS3tJkw6fq9jE9j18THftkZjHHfmFiWtmAbrj";
-static const std::string strSecret2 = "5KC4ejrDjv152FGwP386VD1i2NYc5KkfSMyv1nGy1VGDxGHqVY3";
-static const std::string strSecret1C = "Kwr371tjA9u2rFSMZjTNun2PXXP3WPZu2afRHTcta6KxEUdm1vEw";
-static const std::string strSecret2C = "L3Hq7a8FEQwJkW1M2GNKDW28546Vp5miewcCzSqUD9kCAXrJdS3g";
-static const std::string addr1 = "1QFqqMUD55ZV3PJEJZtaKCsQmjLT6JkjvJ";
-static const std::string addr2 = "1F5y5E5FMc5YzdJtB9hLaUe43GDxEKXENJ";
-static const std::string addr1C = "1NoJrossxPBKfCHuJXT4HadJrXRE9Fxiqs";
-static const std::string addr2C = "1CRj2HyM1CXWzHAXLQtiGLyggNT9WQqsDs";
+// S256: re-encoded from the upstream real-Bitcoin-mainnet WIF/address
+// literals to S256's own mainnet base58 prefixes (see
+// base58Prefixes[SECRET_KEY]/[PUBKEY_ADDRESS] in kernel/chainparams.cpp),
+// preserving the exact underlying private key / hash160 payload -- only
+// the version byte differs, so these test the same key material and
+// derivation relationships as the original upstream vectors.
+static const std::string strSecret1 = "7QRR3XwvHW963ERsAQQi2JScqv2PgNDcrwMXwAcmJ3g9byEbRqN";
+static const std::string strSecret2 = "7RexmM8ERicLWvtNVZE3aQnViZLr2gqq1dShPDcSdmgf3MjNx64";
+static const std::string strSecret1C = "VGNm8BbQBqchErGkQWKe4jz5Cu396kehHQudY5SrWEonyL9d9dhs";
+static const std::string strSecret2C = "VMpZ8jpvG6ey96qjs3EaNTyokRkbQSrWumrRF4fS9JE2uPQ8a1xR";
+static const std::string addr1 = "SkYqsCFMoSkgZh5gqzses71yRWZsvBTYTA";
+static const std::string addr2 = "SbNy74rQ5yGkWw6LiagR8Nnch3TNyMGvd4";
+static const std::string addr1C = "Sj6Jtef2gkNXBW5MqxS8qUmsWJeewfKuan";
+static const std::string addr2C = "SYij48kVjZiiWawysqsnpF8FL9gaKpPNf9";
 
+// Intentionally left as a real-Bitcoin-mainnet address literal: it must
+// fail to decode as a WIF secret regardless of which chain is selected,
+// since its base58 payload carries an address version byte, not a secret
+// key version byte, under any chain currently defined.
 static const std::string strAddressBad = "1HV9Lc3sNHZxwj4Zk6fB38tEmBryq2cBiF";
 
 

@@ -83,7 +83,12 @@ BOOST_AUTO_TEST_CASE(bloom_create_insert_serialize_with_tweak)
 
 BOOST_AUTO_TEST_CASE(bloom_create_insert_key)
 {
-    std::string strSecret = std::string("5Kg1gnAjaLfKiwhhPpGS3QfRg2m6awQvaj98JCZBZQ5SuS2F15C");
+    // S256: re-encoded from the upstream real-Bitcoin-mainnet WIF literal to
+    // S256's own mainnet SECRET_KEY prefix (see bip32_tests.cpp/key_tests.cpp
+    // for the same treatment) -- same underlying private key, so the
+    // resulting pubkey bytes (and the expected serialized filter below) are
+    // unchanged.
+    std::string strSecret = std::string("7S8uoPSkG9GbDdK8WLNP8cSDNDZLYJW69zbufdtfBgVszgWnbog");
     CKey key = DecodeSecret(strSecret);
     CPubKey pubkey = key.GetPubKey();
     std::vector<unsigned char> vchPubKey(pubkey.begin(), pubkey.end());
