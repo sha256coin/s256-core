@@ -185,6 +185,7 @@ jobs:
           cp build/bin/sha256coind build/bin/sha256coin-cli build/bin/sha256coin-tx build/bin/sha256coin-wallet build/bin/sha256coin-qt "$DIST/"
           strip "$DIST/"*
           tar -czf "${DIST}.tar.gz" "$DIST"
+          cp "build/sha256coin-macos-app.zip" "SHA256Coin-${VERSION}-macos-arm64-Qt.zip"
           cp "build/sha256coin-macos-app.dmg" "SHA256Coin-${VERSION}-macos-arm64-Qt.dmg"
 
       - uses: actions/upload-artifact@v4
@@ -192,6 +193,7 @@ jobs:
           name: macos-arm64
           path: |
             SHA256Coin-*.tar.gz
+            SHA256Coin-*.zip
             SHA256Coin-*.dmg
           if-no-files-found: error
 
@@ -241,6 +243,7 @@ jobs:
           cp build/bin/sha256coind build/bin/sha256coin-cli build/bin/sha256coin-tx build/bin/sha256coin-wallet build/bin/sha256coin-qt "$DIST/"
           strip "$DIST/"*
           tar -czf "${DIST}.tar.gz" "$DIST"
+          cp "build/sha256coin-macos-app.zip" "SHA256Coin-${VERSION}-macos-x86_64-Qt.zip"
           cp "build/sha256coin-macos-app.dmg" "SHA256Coin-${VERSION}-macos-x86_64-Qt.dmg"
 
       - uses: actions/upload-artifact@v4
@@ -248,6 +251,7 @@ jobs:
           name: macos-intel
           path: |
             SHA256Coin-*.tar.gz
+            SHA256Coin-*.zip
             SHA256Coin-*.dmg
           if-no-files-found: error
 
