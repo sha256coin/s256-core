@@ -1,21 +1,26 @@
 name: Release
 
-# Builds and publishes Linux + Windows release binaries whenever a version
-# tag (vX.Y.Z) is pushed. Mirrors the manual process used for past
-# releases (SHA256Coin-vX.Y.Z-linux64.tar.gz / -win64.zip, containing
+# Builds and publishes Linux + Windows + macOS (Apple Silicon & Intel)
+# release binaries whenever a version tag (vX.Y.Z) is pushed. Mirrors the
+# manual process used for past releases (SHA256Coin-vX.Y.Z-linux64.tar.gz /
+# -win64.zip / -macos-{arm64,x86_64}.tar.gz + -Qt.dmg, containing
 # sha256coind/-cli/-tx/-wallet/-qt), automated via the depends build
-# system so both legs get portable, self-contained binaries without
-# relying on whatever library versions happen to be on the runner.
+# system for linux64/win64 so both legs get portable, self-contained
+# binaries without relying on whatever library versions happen to be on
+# the runner. The macOS legs build natively (Homebrew Qt6, no depends/,
+# since there's no macOS SDK available for cross-compiling here) and also
+# produce a self-contained .app + .dmg via the `deploy` CMake target.
 #
-# Test gate: the linux64 leg runs test_bitcoin (native, so it actually
-# can) with the exclude list documented in the S256 test-debt notes --
-# everything in that list is either a known crash/cascade bug (excluded
-# so one bad suite doesn't corrupt the whole run) or the still-open
-# 50-vs-100-COIN subsidy assumption (root cause 2, a separate project).
-# Everything NOT excluded must pass, or the job fails and nothing gets
-# published. The win64 leg only builds (no wine set up here to run cross-
-# compiled .exe unit tests), so it's gated on the *same source tree* the
-# linux64 leg already tested, not on its own independent test run.
+# Test gate: the linux64 and both macOS legs run test_bitcoin (native, so
+# they actually can) with the exclude list documented in the S256
+# test-debt notes -- everything in that list is either a known
+# crash/cascade bug (excluded so one bad suite doesn't corrupt the whole
+# run) or the still-open 50-vs-100-COIN subsidy assumption (root cause 2,
+# a separate project). Everything NOT excluded must pass, or the job fails
+# and nothing gets published. The win64 leg only builds (no wine set up
+# here to run cross-compiled .exe unit tests), so it's gated on the *same
+# source tree* the other legs already tested, not on its own independent
+# test run.
 
 on:
   push:
@@ -119,8 +124,134 @@ jobs:
           path: SHA256Coin-*
           if-no-files-found: error
 
+  # macOS legs build natively on GitHub's runners (Homebrew Qt6, no
+  # depends/) rather than cross-compiling, since depends/ has no macOS SDK
+  # available here. This mirrors the same approach already proven on the
+  # BitcoinSilver fork's own macOS CI. Each leg also builds a self-contained
+  # .app (via the `deploy` CMake target, which runs macdeployqtplus to
+  # bundle Qt's real frameworks) and wraps it in a .dmg via hdiutil (native
+  # macOS tool, no extra dependency) for a more familiar drag-to-Applications
+  # download alongside the plain tarball.
+  macos:
+    name: macOS build + tests (Apple Silicon)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      # doc/dependencies.md requires Clang 17.0+; macos-14's default Xcode
+      # (15.4) ships AppleClang 15.0, which is too old to compile this
+      # codebase -- confirmed on the BitcoinSilver fork's own macos-14 job.
+      # Xcode 16.2 is already present on this runner image, just not
+      # selected by default.
+      - name: Select Xcode 16.2 (need Clang 17+, default Xcode 15.4 is too old)
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+
+      - name: Install dependencies
+        run: brew install cmake boost pkgconf libevent qt@6 qrencode python
+
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6)" \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+
+      - name: Build
+        run: |
+          cmake --build build -j"$(sysctl -n hw.ncpu)" \
+            --target bitcoind bitcoin-cli bitcoin-tx bitcoin-wallet bitcoin-qt test_bitcoin
+
+      - name: Run unit tests
+        working-directory: build
+        run: ./bin/test_bitcoin ${{ env.TEST_EXCLUDES }}
+
+      - name: Build macOS .app bundle
+        run: cmake --build build -j"$(sysctl -n hw.ncpu)" --target deploy
+
+      - name: Build DMG
+        run: |
+          hdiutil create -volname "SHA256Coin-Qt" -srcfolder build/SHA256Coin-Qt.app \
+            -ov -format UDZO build/sha256coin-macos-app.dmg
+
+      # macOS ships BSD grep (no -P/PCRE support) but this leg doesn't need
+      # any regex extraction -- version comes straight from the tag, same
+      # as the linux64/win64 legs above.
+      - name: Package
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME}"
+          DIST="SHA256Coin-${VERSION}-macos-arm64"
+          mkdir -p "$DIST"
+          cp build/bin/sha256coind build/bin/sha256coin-cli build/bin/sha256coin-tx build/bin/sha256coin-wallet build/bin/sha256coin-qt "$DIST/"
+          strip "$DIST/"*
+          tar -czf "${DIST}.tar.gz" "$DIST"
+          cp "build/sha256coin-macos-app.dmg" "SHA256Coin-${VERSION}-macos-arm64-Qt.dmg"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64
+          path: |
+            SHA256Coin-*.tar.gz
+            SHA256Coin-*.dmg
+          if-no-files-found: error
+
+  macos-intel:
+    name: macOS build + tests (Intel)
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+
+      # doc/dependencies.md requires Clang 17.0+. Left unpinned deliberately
+      # (unlike the arm64 leg above): macos-15-intel is a newer macOS/Xcode
+      # baseline and its default Xcode may already be new enough. If this
+      # fails on a Clang version error, add an explicit xcode-select step
+      # here the same way the arm64 job needed one.
+      - name: Install dependencies
+        run: brew install cmake boost pkgconf libevent qt@6 qrencode python
+
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6)" \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+
+      - name: Build
+        run: |
+          cmake --build build -j"$(sysctl -n hw.ncpu)" \
+            --target bitcoind bitcoin-cli bitcoin-tx bitcoin-wallet bitcoin-qt test_bitcoin
+
+      - name: Run unit tests
+        working-directory: build
+        run: ./bin/test_bitcoin ${{ env.TEST_EXCLUDES }}
+
+      - name: Build macOS .app bundle
+        run: cmake --build build -j"$(sysctl -n hw.ncpu)" --target deploy
+
+      - name: Build DMG
+        run: |
+          hdiutil create -volname "SHA256Coin-Qt" -srcfolder build/SHA256Coin-Qt.app \
+            -ov -format UDZO build/sha256coin-macos-app.dmg
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME}"
+          DIST="SHA256Coin-${VERSION}-macos-x86_64"
+          mkdir -p "$DIST"
+          cp build/bin/sha256coind build/bin/sha256coin-cli build/bin/sha256coin-tx build/bin/sha256coin-wallet build/bin/sha256coin-qt "$DIST/"
+          strip "$DIST/"*
+          tar -czf "${DIST}.tar.gz" "$DIST"
+          cp "build/sha256coin-macos-app.dmg" "SHA256Coin-${VERSION}-macos-x86_64-Qt.dmg"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-intel
+          path: |
+            SHA256Coin-*.tar.gz
+            SHA256Coin-*.dmg
+          if-no-files-found: error
+
   publish:
-    needs: build
+    needs: [build, macos, macos-intel]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
