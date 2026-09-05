@@ -154,7 +154,7 @@ jobs:
         run: |
           cmake -B build \
             -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6)" \
-            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DENABLE_IPC=OFF
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DBUILD_GUI=ON -DENABLE_IPC=OFF
 
       - name: Build
         run: |
@@ -213,7 +213,7 @@ jobs:
         run: |
           cmake -B build \
             -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6)" \
-            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DENABLE_IPC=OFF
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DBUILD_GUI=ON -DENABLE_IPC=OFF
 
       - name: Build
         run: |
