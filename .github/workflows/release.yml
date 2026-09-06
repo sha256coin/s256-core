@@ -111,12 +111,13 @@ jobs:
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME}"
           DIST="SHA256Coin-${VERSION}-${{ matrix.target }}"
-          mkdir -p "$DIST"
+          mkdir -p "$DIST/bin"
+          cp README.md COPYING "$DIST/"
           if [ "${{ matrix.target }}" = "win64" ]; then
-            cp build/bin/sha256coind.exe build/bin/sha256coin-cli.exe build/bin/sha256coin-tx.exe build/bin/sha256coin-util.exe build/bin/sha256coin-wallet.exe build/bin/sha256coin-qt.exe "$DIST/"
+            cp build/bin/sha256coind.exe build/bin/sha256coin-cli.exe build/bin/sha256coin-tx.exe build/bin/sha256coin-util.exe build/bin/sha256coin-wallet.exe build/bin/sha256coin-qt.exe "$DIST/bin/"
             zip -r "${DIST}.zip" "$DIST"
           else
-            cp build/bin/sha256coind build/bin/sha256coin-cli build/bin/sha256coin-tx build/bin/sha256coin-util build/bin/sha256coin-wallet build/bin/sha256coin-qt "$DIST/"
+            cp build/bin/sha256coind build/bin/sha256coin-cli build/bin/sha256coin-tx build/bin/sha256coin-util build/bin/sha256coin-wallet build/bin/sha256coin-qt "$DIST/bin/"
             tar -czf "${DIST}.tar.gz" "$DIST"
           fi
 
@@ -183,9 +184,10 @@ jobs:
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME}"
           DIST="SHA256Coin-${VERSION}-macos-arm64"
-          mkdir -p "$DIST"
-          cp build/bin/sha256coind build/bin/sha256coin-cli build/bin/sha256coin-tx build/bin/sha256coin-util build/bin/sha256coin-wallet build/bin/sha256coin-qt "$DIST/"
-          strip "$DIST/"*
+          mkdir -p "$DIST/bin"
+          cp README.md COPYING "$DIST/"
+          cp build/bin/sha256coind build/bin/sha256coin-cli build/bin/sha256coin-tx build/bin/sha256coin-util build/bin/sha256coin-wallet build/bin/sha256coin-qt "$DIST/bin/"
+          strip "$DIST/bin/"*
           tar -czf "${DIST}.tar.gz" "$DIST"
           cp "build/sha256coin-macos-app.zip" "SHA256Coin-${VERSION}-macos-arm64-Qt.zip"
           cp "build/sha256coin-macos-app.dmg" "SHA256Coin-${VERSION}-macos-arm64-Qt.dmg"
@@ -242,9 +244,10 @@ jobs:
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME}"
           DIST="SHA256Coin-${VERSION}-macos-x86_64"
-          mkdir -p "$DIST"
-          cp build/bin/sha256coind build/bin/sha256coin-cli build/bin/sha256coin-tx build/bin/sha256coin-util build/bin/sha256coin-wallet build/bin/sha256coin-qt "$DIST/"
-          strip "$DIST/"*
+          mkdir -p "$DIST/bin"
+          cp README.md COPYING "$DIST/"
+          cp build/bin/sha256coind build/bin/sha256coin-cli build/bin/sha256coin-tx build/bin/sha256coin-util build/bin/sha256coin-wallet build/bin/sha256coin-qt "$DIST/bin/"
+          strip "$DIST/bin/"*
           tar -czf "${DIST}.tar.gz" "$DIST"
           cp "build/sha256coin-macos-app.zip" "SHA256Coin-${VERSION}-macos-x86_64-Qt.zip"
           cp "build/sha256coin-macos-app.dmg" "SHA256Coin-${VERSION}-macos-x86_64-Qt.dmg"
