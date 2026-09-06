@@ -391,6 +391,7 @@ if(BUILD_UTIL)
     bitcoin_common
     bitcoin_util
   )
+  set_target_properties(bitcoin-util PROPERTIES OUTPUT_NAME "sha256coin-util")
   install_binary_component(bitcoin-util HAS_MANPAGE)
 endif()
 

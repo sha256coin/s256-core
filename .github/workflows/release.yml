@@ -4,11 +4,12 @@ name: Release
 # release binaries whenever a version tag (vX.Y.Z) is pushed. Mirrors the
 # manual process used for past releases (SHA256Coin-vX.Y.Z-linux64.tar.gz /
 # -win64.zip / -macos-{arm64,x86_64}.tar.gz + -Qt.dmg, containing
-# sha256coind/-cli/-tx/-wallet/-qt), automated via the depends build
-# system for linux64/win64 so both legs get portable, self-contained
-# binaries without relying on whatever library versions happen to be on
-# the runner. The macOS legs build natively (Homebrew Qt6, no depends/,
-# since there's no macOS SDK available for cross-compiling here) and also
+# sha256coind/-cli/-tx/-util/-wallet/-qt, all built with ZMQ notification
+# support enabled), automated via the depends build system for
+# linux64/win64 so both legs get portable, self-contained binaries without
+# relying on whatever library versions happen to be on the runner. The
+# macOS legs build natively (Homebrew Qt6 + zmq, no depends/, since
+# there's no macOS SDK available for cross-compiling here) and also
 # produce a self-contained .app + .dmg via the `deploy` CMake target.
 #
 # Test gate: the linux64 and both macOS legs run test_bitcoin (native, so
@@ -95,7 +96,7 @@ jobs:
         run: make -C depends HOST=${{ matrix.host }} -j$(nproc)
 
       - name: Configure
-        run: cmake -B build --toolchain depends/${{ matrix.host }}/toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+        run: cmake -B build --toolchain depends/${{ matrix.host }}/toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DBUILD_TX=ON -DBUILD_UTIL=ON -DBUILD_WALLET_TOOL=ON -DWITH_ZMQ=ON
 
       - name: Build
         run: cmake --build build -j$(nproc)
@@ -112,10 +113,10 @@ jobs:
           DIST="SHA256Coin-${VERSION}-${{ matrix.target }}"
           mkdir -p "$DIST"
           if [ "${{ matrix.target }}" = "win64" ]; then
-            cp build/bin/sha256coind.exe build/bin/sha256coin-cli.exe build/bin/sha256coin-tx.exe build/bin/sha256coin-wallet.exe build/bin/sha256coin-qt.exe "$DIST/"
+            cp build/bin/sha256coind.exe build/bin/sha256coin-cli.exe build/bin/sha256coin-tx.exe build/bin/sha256coin-util.exe build/bin/sha256coin-wallet.exe build/bin/sha256coin-qt.exe "$DIST/"
             zip -r "${DIST}.zip" "$DIST"
           else
-            cp build/bin/sha256coind build/bin/sha256coin-cli build/bin/sha256coin-tx build/bin/sha256coin-wallet build/bin/sha256coin-qt "$DIST/"
+            cp build/bin/sha256coind build/bin/sha256coin-cli build/bin/sha256coin-tx build/bin/sha256coin-util build/bin/sha256coin-wallet build/bin/sha256coin-qt "$DIST/"
             tar -czf "${DIST}.tar.gz" "$DIST"
           fi
 
@@ -148,18 +149,19 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_16.2.app
 
       - name: Install dependencies
-        run: brew install cmake boost pkgconf libevent qt@6 qrencode python
+        run: brew install cmake boost pkgconf libevent qt@6 qrencode python zmq
 
       - name: Configure
         run: |
           cmake -B build \
             -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6)" \
-            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DBUILD_GUI=ON -DENABLE_IPC=OFF
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DBUILD_GUI=ON -DENABLE_IPC=OFF \
+            -DBUILD_TX=ON -DBUILD_UTIL=ON -DBUILD_WALLET_TOOL=ON -DWITH_ZMQ=ON
 
       - name: Build
         run: |
           cmake --build build -j"$(sysctl -n hw.ncpu)" \
-            --target bitcoind bitcoin-cli bitcoin-tx bitcoin-wallet bitcoin-qt test_bitcoin
+            --target bitcoind bitcoin-cli bitcoin-tx bitcoin-util bitcoin-wallet bitcoin-qt test_bitcoin
 
       - name: Run unit tests
         working-directory: build
@@ -182,7 +184,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME}"
           DIST="SHA256Coin-${VERSION}-macos-arm64"
           mkdir -p "$DIST"
-          cp build/bin/sha256coind build/bin/sha256coin-cli build/bin/sha256coin-tx build/bin/sha256coin-wallet build/bin/sha256coin-qt "$DIST/"
+          cp build/bin/sha256coind build/bin/sha256coin-cli build/bin/sha256coin-tx build/bin/sha256coin-util build/bin/sha256coin-wallet build/bin/sha256coin-qt "$DIST/"
           strip "$DIST/"*
           tar -czf "${DIST}.tar.gz" "$DIST"
           cp "build/sha256coin-macos-app.zip" "SHA256Coin-${VERSION}-macos-arm64-Qt.zip"
@@ -209,18 +211,19 @@ jobs:
       # fails on a Clang version error, add an explicit xcode-select step
       # here the same way the arm64 job needed one.
       - name: Install dependencies
-        run: brew install cmake boost pkgconf libevent qt@6 qrencode python
+        run: brew install cmake boost pkgconf libevent qt@6 qrencode python zmq
 
       - name: Configure
         run: |
           cmake -B build \
             -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6)" \
-            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DBUILD_GUI=ON -DENABLE_IPC=OFF
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DBUILD_GUI=ON -DENABLE_IPC=OFF \
+            -DBUILD_TX=ON -DBUILD_UTIL=ON -DBUILD_WALLET_TOOL=ON -DWITH_ZMQ=ON
 
       - name: Build
         run: |
           cmake --build build -j"$(sysctl -n hw.ncpu)" \
-            --target bitcoind bitcoin-cli bitcoin-tx bitcoin-wallet bitcoin-qt test_bitcoin
+            --target bitcoind bitcoin-cli bitcoin-tx bitcoin-util bitcoin-wallet bitcoin-qt test_bitcoin
 
       - name: Run unit tests
         working-directory: build
@@ -240,7 +243,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME}"
           DIST="SHA256Coin-${VERSION}-macos-x86_64"
           mkdir -p "$DIST"
-          cp build/bin/sha256coind build/bin/sha256coin-cli build/bin/sha256coin-tx build/bin/sha256coin-wallet build/bin/sha256coin-qt "$DIST/"
+          cp build/bin/sha256coind build/bin/sha256coin-cli build/bin/sha256coin-tx build/bin/sha256coin-util build/bin/sha256coin-wallet build/bin/sha256coin-qt "$DIST/"
           strip "$DIST/"*
           tar -czf "${DIST}.tar.gz" "$DIST"
           cp "build/sha256coin-macos-app.zip" "SHA256Coin-${VERSION}-macos-x86_64-Qt.zip"
