@@ -15,6 +15,7 @@
 #include <util/hasher.h>
 
 #include <deque>
+#include <memory>
 #include <vector>
 
 // A compressed CBlockHeader, which leaves out the prevhash
@@ -26,6 +27,11 @@ struct CompressedHeader {
     uint32_t nBits{0};
     uint32_t nNonce{0};
 
+    // S256: a merge-mined header's auxpow. Headers are redownloaded through
+    // this struct, and dropping the auxpow would make every merge-mined
+    // header fail validation ("auxpow-missing") once released.
+    std::shared_ptr<CAuxPow> auxpow;
+
     CompressedHeader()
     {
         hashMerkleRoot.SetNull();
@@ -36,7 +42,8 @@ struct CompressedHeader {
           hashMerkleRoot{header.hashMerkleRoot},
           nTime{header.nTime},
           nBits{header.nBits},
-          nNonce{header.nNonce}
+          nNonce{header.nNonce},
+          auxpow{header.auxpow}
     {
     }
 
@@ -49,6 +56,7 @@ struct CompressedHeader {
         ret.nTime = nTime;
         ret.nBits = nBits;
         ret.nNonce = nNonce;
+        ret.auxpow = auxpow;
         return ret;
     };
 };
