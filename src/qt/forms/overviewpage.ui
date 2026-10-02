@@ -192,7 +192,7 @@
                <string>Your current total balance</string>
               </property>
               <property name="text">
-               <string notr="true">21 000 000.00000000 S256</string>
+               <string notr="true">84 000 000.00000000 S256</string>
               </property>
               <property name="alignment">
                <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -218,7 +218,7 @@
                <string>Your current spendable balance</string>
               </property>
               <property name="text">
-               <string notr="true">21 000 000.00000000 S256</string>
+               <string notr="true">84 000 000.00000000 S256</string>
               </property>
               <property name="alignment">
                <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
