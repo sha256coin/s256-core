@@ -1086,6 +1086,37 @@ bool BlockManager::ReadBlock(CBlock& block, const CBlockIndex& index) const
     return ReadBlock(block, block_pos, index.GetBlockHash());
 }
 
+std::optional<CBlockHeader> BlockManager::ReadBlockHeader(const CBlockIndex& index) const
+{
+    CBlockHeader header{index.GetPureHeader()};
+    if (!header.IsAuxpow()) return header;
+
+    FlatFilePos pos;
+    {
+        LOCK(cs_main);
+        if (!(index.nStatus & BLOCK_HAVE_DATA)) return std::nullopt;
+        pos = index.GetBlockPos();
+    }
+
+    // Read only the header (with its auxpow), not the whole block. The file
+    // can still be pruned after cs_main is released, so a failed open or read
+    // is an expected outcome here, not an error.
+    try {
+        AutoFile file{OpenBlockFile(pos, /*fReadOnly=*/true)};
+        if (file.IsNull()) return std::nullopt;
+        file >> header;
+    } catch (const std::exception& e) {
+        LogDebug(BCLog::BLOCKSTORAGE, "Could not read header of %s at %s: %s\n", index.GetBlockHash().ToString(), pos.ToString(), e.what());
+        return std::nullopt;
+    }
+
+    if (header.GetHash() != index.GetBlockHash() || !CheckProofOfWork(header, GetConsensus())) {
+        LogError("Header read from disk at %s does not match the block index entry %s", pos.ToString(), index.GetBlockHash().ToString());
+        return std::nullopt;
+    }
+    return header;
+}
+
 BlockManager::ReadRawBlockResult BlockManager::ReadRawBlock(const FlatFilePos& pos, std::optional<std::pair<size_t, size_t>> block_part) const
 {
     if (pos.nPos < STORAGE_HEADER_BYTES) {

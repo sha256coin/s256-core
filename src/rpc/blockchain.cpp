@@ -657,8 +657,14 @@ static RPCHelpMan getblockheader()
 
     if (!fVerbose)
     {
+        // S256: a merge-mined block's header (with its auxpow) is read from
+        // disk and is unavailable if the block is pruned or not downloaded.
+        const auto header{chainman.m_blockman.ReadBlockHeader(*pblockindex)};
+        if (!header) {
+            throw JSONRPCError(RPC_MISC_ERROR, "Block header not available: the block is merge-mined and its data is not on disk (pruned or not downloaded yet)");
+        }
         DataStream ssBlock{};
-        ssBlock << pblockindex->GetBlockHeader();
+        ssBlock << *header;
         std::string strHex = HexStr(ssBlock);
         return strHex;
     }

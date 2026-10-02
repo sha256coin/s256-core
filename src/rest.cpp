@@ -237,7 +237,12 @@ static bool rest_headers(const std::any& context,
     case RESTResponseFormat::BINARY: {
         DataStream ssHeader{};
         for (const CBlockIndex *pindex : headers) {
-            ssHeader << pindex->GetBlockHeader();
+            // S256: a merge-mined block's header is read from disk.
+            const auto header{chainman.m_blockman.ReadBlockHeader(*pindex)};
+            if (!header) {
+                return RESTERR(req, HTTP_NOT_FOUND, pindex->GetBlockHash().GetHex() + " header not available (merge-mined block not on disk)");
+            }
+            ssHeader << *header;
         }
 
         req->WriteHeader("Content-Type", "application/octet-stream");
@@ -248,7 +253,12 @@ static bool rest_headers(const std::any& context,
     case RESTResponseFormat::HEX: {
         DataStream ssHeader{};
         for (const CBlockIndex *pindex : headers) {
-            ssHeader << pindex->GetBlockHeader();
+            // S256: a merge-mined block's header is read from disk.
+            const auto header{chainman.m_blockman.ReadBlockHeader(*pindex)};
+            if (!header) {
+                return RESTERR(req, HTTP_NOT_FOUND, pindex->GetBlockHash().GetHex() + " header not available (merge-mined block not on disk)");
+            }
+            ssHeader << *header;
         }
 
         std::string strHex = HexStr(ssHeader) + "\n";

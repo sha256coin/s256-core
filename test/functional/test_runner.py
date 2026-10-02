@@ -291,6 +291,7 @@ BASE_SCRIPTS = [
     'wallet_importdescriptors.py',
     'wallet_crosschain.py',
     'feature_auxpow_segwit.py',
+    'feature_auxpow_headers.py',
     'mining_basic.py',
     'mining_mainnet.py',
     'feature_signet.py',

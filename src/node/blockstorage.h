@@ -469,6 +469,15 @@ public:
     /** Functions for disk access for blocks */
     bool ReadBlock(CBlock& block, const FlatFilePos& pos, const std::optional<uint256>& expected_hash) const;
     bool ReadBlock(CBlock& block, const CBlockIndex& index) const;
+    /**
+     * The complete header of the block at `index`. The block index does not
+     * store the auxpow, so for a merge-mined block the header is read from
+     * the block file and checked against the index (hash and proof of work).
+     * Returns std::nullopt if that block's data is not available: not
+     * downloaded yet (headers-only entry), pruned, or unreadable. Headers of
+     * other blocks are always available.
+     */
+    std::optional<CBlockHeader> ReadBlockHeader(const CBlockIndex& index) const;
     ReadRawBlockResult ReadRawBlock(const FlatFilePos& pos, std::optional<std::pair<size_t, size_t>> block_part = std::nullopt) const;
 
     bool ReadBlockUndo(CBlockUndo& blockundo, const CBlockIndex& index) const;

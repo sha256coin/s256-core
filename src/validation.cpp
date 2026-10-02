@@ -5462,7 +5462,7 @@ void ChainstateManager::CheckBlockIndex() const
                 }
             }
         }
-        // assert(pindex->GetBlockHash() == pindex->GetBlockHeader().GetHash()); // Perhaps too slow
+        // assert(pindex->GetBlockHash() == pindex->GetPureHeader().GetHash()); // Perhaps too slow
         // End: actual consistency checks.
 
 

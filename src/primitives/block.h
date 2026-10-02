@@ -14,6 +14,7 @@
 #include <util/time.h>
 
 #include <cstdint>
+#include <ios>
 #include <memory>
 #include <string>
 #include <utility>
@@ -45,11 +46,20 @@ public:
         SetNull();
     }
 
+    /** The header fields alone, without an auxpow. For a merge-mined block
+     * this is not a complete header and cannot be serialized; see
+     * node::BlockManager::ReadBlockHeader for the complete one. */
+    explicit CBlockHeader(const CPureBlockHeader& header) : CPureBlockHeader{header} {}
+
     SERIALIZE_METHODS(CBlockHeader, obj)
     {
         READWRITE(AsBase<CPureBlockHeader>(obj));
         if (obj.nVersion & VERSION_AUXPOW_BIT) {
             SER_READ(obj, obj.auxpow = std::make_shared<CAuxPow>());
+            // A header rebuilt from the block index carries the auxpow bit but
+            // not the auxpow itself. Refuse to write it instead of
+            // dereferencing a null pointer.
+            if (!obj.auxpow) throw std::ios_base::failure("CBlockHeader: auxpow bit set but no auxpow to serialize");
             READWRITE(*obj.auxpow);
         }
     }

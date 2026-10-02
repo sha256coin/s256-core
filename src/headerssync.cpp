@@ -29,7 +29,7 @@ HeadersSyncState::HeadersSyncState(NodeId id,
       m_chain_start(chain_start),
       m_minimum_required_work(minimum_required_work),
       m_current_chain_work(chain_start.nChainWork),
-      m_last_header_received(m_chain_start.GetBlockHeader()),
+      m_last_header_received(m_chain_start.GetPureHeader()),
       m_current_height(chain_start.nHeight)
 {
     // Estimate the number of blocks that could possibly exist on the peer's

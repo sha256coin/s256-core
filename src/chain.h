@@ -182,9 +182,16 @@ public:
         return ret;
     }
 
-    CBlockHeader GetBlockHeader() const
+    /**
+     * The header fields stored in the index. The index does not store the
+     * auxpow, so for a merge-mined block (VERSION_AUXPOW_BIT set) this is not
+     * the complete header: use it for hashing and field access only, and
+     * node::BlockManager::ReadBlockHeader() for anything that serializes the
+     * header or relays it to peers.
+     */
+    CPureBlockHeader GetPureHeader() const
     {
-        CBlockHeader block;
+        CPureBlockHeader block;
         block.nVersion = nVersion;
         if (pprev)
             block.hashPrevBlock = pprev->GetBlockHash();

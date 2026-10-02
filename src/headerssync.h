@@ -250,7 +250,7 @@ private:
     uint64_t m_max_commitments{0};
 
     /** Store the latest header received while in PRESYNC (initialized to m_chain_start) */
-    CBlockHeader m_last_header_received;
+    CPureBlockHeader m_last_header_received;
 
     /** Height of m_last_header_received */
     int64_t m_current_height{0};

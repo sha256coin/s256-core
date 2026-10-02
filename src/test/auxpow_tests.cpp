@@ -312,4 +312,22 @@ BOOST_AUTO_TEST_CASE(auxpow_header_hash_independent_of_auxpow)
     BOOST_CHECK(roundTripped.auxpow != nullptr);
 }
 
+BOOST_AUTO_TEST_CASE(auxpow_bit_without_auxpow_not_serializable)
+{
+    // What CBlockIndex::GetPureHeader() gives for a merge-mined block: the
+    // auxpow bit but no auxpow. Serializing it must fail cleanly, not crash.
+    CBlockHeader header;
+    header.nVersion |= VERSION_AUXPOW_BIT;
+    BOOST_REQUIRE(!header.auxpow);
+    DataStream stream;
+    BOOST_CHECK_THROW(stream << header, std::ios_base::failure);
+    BOOST_CHECK_THROW(GetSerializeSize(header), std::ios_base::failure);
+
+    // Without the bit nothing is missing.
+    header.nVersion &= ~VERSION_AUXPOW_BIT;
+    stream.clear();
+    stream << header;
+    BOOST_CHECK_EQUAL(stream.size(), 80U);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

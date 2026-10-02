@@ -1159,7 +1159,10 @@ btck_Block* btck_block_read(const btck_ChainstateManager* chainman, const btck_B
 
 btck_BlockHeader* btck_block_tree_entry_get_block_header(const btck_BlockTreeEntry* entry)
 {
-    return btck_BlockHeader::create(btck_BlockTreeEntry::get(entry).GetBlockHeader());
+    // S256: the block index does not store the auxpow, so for a merge-mined
+    // block this header lacks it. The API only exposes the header's fields
+    // and hash, which are complete.
+    return btck_BlockHeader::create(CBlockHeader{btck_BlockTreeEntry::get(entry).GetPureHeader()});
 }
 
 int32_t btck_block_tree_entry_get_height(const btck_BlockTreeEntry* entry)

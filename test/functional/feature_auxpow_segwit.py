@@ -9,17 +9,9 @@
   witnesses, confirms them, and relays to a peer
 """
 
-from test_framework.messages import (
-    COutPoint,
-    CBlockHeader,
-    CTransaction,
-    CTxIn,
-    CTxOut,
-    ser_compact_size,
-)
-from test_framework.script import (
-    CScript,
-    OP_TRUE,
+from test_framework.auxpow import (
+    VERSION_AUXPOW_BIT,
+    create_auxpow,
 )
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
@@ -27,34 +19,8 @@ from test_framework.util import (
     assert_greater_than,
 )
 
-MERGE_MINING_HEADER = bytes.fromhex("fabe6d6d")
-VERSION_AUXPOW_BIT = 1 << 8
 WITNESS_COMMITMENT_PREFIX = "6a24aa21a9ed"
 COINBASE_MATURITY = 200  # S256: 2x Bitcoin's
-
-
-def create_auxpow(aux_hash_hex, bits_hex):
-    """Build a minimal auxpow for a single aux chain: a parent coinbase whose
-    scriptSig carries the merge-mining tag, as the only transaction of a
-    parent header ground to meet the aux block's target."""
-    tag = (MERGE_MINING_HEADER + bytes.fromhex(aux_hash_hex)[::-1]
-           + (1).to_bytes(4, "little")    # merkle tree size: one aux chain
-           + (0).to_bytes(4, "little"))   # merkle nonce
-    coinbase = CTransaction()
-    coinbase.vin = [CTxIn(COutPoint(0, 0xffffffff), CScript([tag]))]
-    coinbase.vout = [CTxOut(0, CScript([OP_TRUE]))]
-
-    parent = CBlockHeader()
-    parent.hashMerkleRoot = coinbase.txid_int
-    parent.nBits = int(bits_hex, 16)
-    target = (parent.nBits & 0xffffff) << (8 * ((parent.nBits >> 24) - 3))
-    while parent.hash_int > target:
-        parent.nNonce += 1
-
-    return (coinbase.serialize()
-            + ser_compact_size(0) + (0).to_bytes(4, "little")   # coinbase merkle branch, index
-            + ser_compact_size(0) + (0).to_bytes(4, "little")   # chain merkle branch, index
-            + parent.serialize()).hex()
 
 
 class AuxpowSegwitTest(BitcoinTestFramework):

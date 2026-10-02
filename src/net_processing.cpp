@@ -4447,9 +4447,20 @@ void PeerManagerImpl::ProcessMessage(Peer& peer, CNode& pfrom, const std::string
         std::vector<CBlock> vHeaders;
         int nLimit = m_opts.max_headers_result;
         LogDebug(BCLog::NET, "getheaders %d to %s from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop.IsNull() ? "end" : hashStop.ToString(), pfrom.GetId());
+        bool header_unavailable{false};
         for (; pindex; pindex = m_chainman.ActiveChain().Next(pindex))
         {
-            vHeaders.emplace_back(pindex->GetBlockHeader());
+            // S256: a merge-mined block's header has to be read from disk,
+            // which fails if the block was pruned. Send what we have; the
+            // peer can get the rest from others.
+            auto header{m_chainman.m_blockman.ReadBlockHeader(*pindex)};
+            if (!header) {
+                LogDebug(BCLog::NET, "getheaders: header of %s not available (pruned?), sending %u headers to peer=%d\n",
+                         pindex->GetBlockHash().ToString(), vHeaders.size(), pfrom.GetId());
+                header_unavailable = true;
+                break;
+            }
+            vHeaders.emplace_back(*header);
             if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
                 break;
         }
@@ -4465,7 +4476,9 @@ void PeerManagerImpl::ProcessMessage(Peer& peer, CNode& pfrom, const std::string
         // without the new block. By resetting the BestHeaderSent, we ensure we
         // will re-announce the new block via headers (or compact blocks again)
         // in the SendMessages logic.
-        nodestate->pindexBestHeaderSent = pindex ? pindex : m_chainman.ActiveChain().Tip();
+        //
+        // S256: if a header was unavailable, the last one sent is its parent.
+        nodestate->pindexBestHeaderSent = pindex ? (header_unavailable ? pindex->pprev : pindex) : m_chainman.ActiveChain().Tip();
         MakeAndPushMessage(pfrom, NetMsgType::HEADERS, TX_WITH_WITNESS(vHeaders));
         return;
     }
@@ -5871,16 +5884,29 @@ bool PeerManagerImpl::SendMessages(CNode& node)
                         break;
                     }
                     pBestIndex = pindex;
+                    // S256: a merge-mined header is read from disk; fall back
+                    // to an inv in the unlikely case it can't be.
+                    const auto add_header{[&] {
+                        auto header{m_chainman.m_blockman.ReadBlockHeader(*pindex)};
+                        if (header) vHeaders.emplace_back(*header);
+                        return header.has_value();
+                    }};
                     if (fFoundStartingHeader) {
                         // add this to the headers message
-                        vHeaders.emplace_back(pindex->GetBlockHeader());
+                        if (!add_header()) {
+                            fRevertToInv = true;
+                            break;
+                        }
                     } else if (PeerHasHeader(&state, pindex)) {
                         continue; // keep looking for the first new block
                     } else if (pindex->pprev == nullptr || PeerHasHeader(&state, pindex->pprev)) {
                         // Peer doesn't have this header but they do have the prior one.
                         // Start sending headers.
                         fFoundStartingHeader = true;
-                        vHeaders.emplace_back(pindex->GetBlockHeader());
+                        if (!add_header()) {
+                            fRevertToInv = true;
+                            break;
+                        }
                     } else {
                         // Peer doesn't have this header or the prior one -- nothing will
                         // connect, so bail out.
