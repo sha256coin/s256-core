@@ -25,21 +25,24 @@ constants are taken from the source, cited below.
 
 Baseline before porting (full run with the exclude list): 14,256 failures.
 After step 1 (subsidy tests + `MAX_MONEY`): **39 failures**, all in the 9 suites below.
+After step 3: those 9 suites pass.
+
+Still excluded from the full run (crash/cascade, root causes outside these steps): `miner_tests/CreateNewBlock_validity`, `net_peer_connection_tests`, `net_tests/initial_advertise_from_version_message`, `net_tests/advertise_local_address`, `txpackage_tests`, `txvalidationcache_tests/checkinputs_test`, `validation_chainstate_tests/chainstate_update_tip`, `validation_chainstatemanager_tests`.
 
 | Suite / case | Status | Notes |
 |---|---|---|
 | `validation_tests/block_subsidy_test` | Ported | Initial subsidy 50 -> 100 COIN |
 | `validation_tests/subsidy_limit_test` | Ported | Cap 50 -> 100 COIN; range 14M -> 28M blocks (doubled halving interval); expected total 8,399,999,995,380,000 sat |
 | `transaction_tests/tx_invalid` | Ported | `MAX_MONEY + 1` vectors re-encoded at 84M (failed after the `MAX_MONEY` change) |
-| `spend_tests` (10) | Failing | Step 3 |
-| `script_standard_tests` (8) | Failing | Step 3 |
-| `util_tests` (6) | Failing | Step 3 |
-| `miniminer_tests` (4) | Failing | Step 3 |
-| `disconnected_transactions` (3) | Failing | Step 3 |
-| `bip328_tests` (3) | Failing | Step 3 |
-| `walletload_tests` (2) | Failing | Step 3 |
-| `interfaces_tests` (2) | Failing | Step 3 |
-| `wallet_tests` (1) | Failing | Step 3 |
+| `spend_tests` (10) | Ported | Coinbase input 50 -> 100 COIN; preset-inputs scenario amounts doubled (400 wallet / 300 preset / 598 target) |
+| `script_standard_tests` (8) | Ported | Taproot builder literal re-encoded with HRP `s2`; BIP341 vectors kept as published, expected address re-encoded with `Params().Bech32HRP()` |
+| `util_tests` (6) | Ported | `message_verify` addresses re-encoded with S256 base58 prefixes (same key hashes; `MESSAGE_MAGIC` unchanged, signatures still valid) |
+| `miniminer_tests` (4) | Ported | tx2/tx4 tie at equal feerate is broken by txid; expected order now derived from the txids |
+| `disconnected_transactions` (3) | Ported | Uses the first 100 of the fixture's `COINBASE_MATURITY` (200) coinbases |
+| `bip328_tests` (3) | Ported | BIP328 vectors kept as published; version bytes swapped to S256's `EXT_PUBLIC_KEY` before comparing |
+| `walletload_tests` (2) | Ported | Descriptor xpub re-encoded with S256 version bytes, checksum recomputed |
+| `interfaces_tests` (2) | Ported | Fixture tip height is `COINBASE_MATURITY`, not 100 |
+| `wallet_tests` (1) | Ported | One mature coinbase is 100 COIN |
 
 ### Decision: `MAX_MONEY` raised to 84M (2026-10-02)
 
@@ -95,7 +98,8 @@ a node bug.
 | `p2p_blocksonly.py`, `p2p_compactblocks.py`, `p2p_getdata.py`, `p2p_ping.py` | Passing | |
 | `rpc_help.py`, `rpc_net.py` (v1, v2), `rpc_signmessagewithprivkey.py`, `rpc_uptime.py` | Passing | |
 | `wallet_createwallet.py` (+ `--usecli`), `wallet_keypool.py`, `wallet_listtransactions.py` | Passing | |
-| `mining_basic.py`, `rpc_getchaintips.py`, `rpc_misc.py`, `p2p_leak.py` | Failing | Expect tip height 200/201 (now 300/301) |
+| `mining_basic.py` | **Blocked: node bug** | `-blockversion=1337` sets the AuxPoW bit (0x100) without an auxpow; the node segfaults serializing the template. See "Node bug found" below |
+| `rpc_getchaintips.py`, `rpc_misc.py`, `p2p_leak.py` | Failing | Expect tip height 200/201 (now 300/301) |
 | `wallet_basic.py`, `wallet_balance.py`, `wallet_send.py`, `wallet_address_types.py` | Failing | Expect 50-coin coinbase balances |
 | `rpc_blockchain.py` (v1, v2) | Failing | UTXO set totals assume 50-coin subsidy |
 | `feature_segwit.py` (v1, v2), `p2p_segwit.py` | Failing | Spend coinbases that are immature under maturity 200 |
@@ -106,6 +110,21 @@ a node bug.
 
 Running: no environment variables needed any more,
 `python3 test/functional/test_runner.py <tests>` from `build-release`.
+
+### Node bug found (2026-10-02): crash serializing headers of merge-mined blocks
+
+`CBlockHeader` serialization (`src/primitives/block.h:51-54`) dereferences
+`auxpow` whenever `nVersion` has `VERSION_AUXPOW_BIT`, but headers rebuilt from
+the block index (`CBlockIndex::GetBlockHeader()`, `src/chain.h:185-196`) carry
+the bit and no auxpow. Serializing one segfaults the node. Reproduced:
+- a fresh peer syncing headers from a node that holds one merge-mined block
+  crashes that node (`getheaders` reply, `src/net_processing.cpp:4452`)
+- `getblockheader <aux block hash> false` crashes the node
+  (`src/rpc/blockchain.cpp:661`)
+Same path, not separately reproduced: header announcements
+(`src/net_processing.cpp:5876, 5883`), REST `/headers` (`src/rest.cpp:240, 251`).
+Also hit by `-blockversion` with bit 8 set (regtest-only option).
+Reported, not fixed (node code).
 
 ### Also known
 

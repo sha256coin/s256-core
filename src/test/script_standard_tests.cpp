@@ -6,6 +6,8 @@
 
 #include <addresstype.h>
 #include <key.h>
+#include <bech32.h>
+#include <chainparams.h>
 #include <key_io.h>
 #include <script/script.h>
 #include <script/signingprovider.h>
@@ -448,7 +450,9 @@ BOOST_AUTO_TEST_CASE(script_standard_taproot_builder)
     BOOST_CHECK(builder.IsValid() && builder.IsComplete());
     builder.Finalize(key_inner);
     BOOST_CHECK(builder.IsValid() && builder.IsComplete());
-    BOOST_CHECK_EQUAL(EncodeDestination(builder.GetOutput()), "bc1pj6gaw944fy0xpmzzu45ugqde4rz7mqj5kj0tg8kmr5f0pjq8vnaqgynnge");
+    // S256: upstream's bc1pj6gaw944fy0xpmzzu45ugqde4rz7mqj5kj0tg8kmr5f0pjq8vnaqgynnge with
+    // S256's mainnet bech32 HRP "s2" (src/kernel/chainparams.cpp).
+    BOOST_CHECK_EQUAL(EncodeDestination(builder.GetOutput()), "s21pj6gaw944fy0xpmzzu45ugqde4rz7mqj5kj0tg8kmr5f0pjq8vnaqegs5qc");
 }
 
 BOOST_AUTO_TEST_CASE(bip341_spk_test_vectors)
@@ -479,7 +483,12 @@ BOOST_AUTO_TEST_CASE(bip341_spk_test_vectors)
         parse_tree(vec["given"]["scriptTree"], 0);
         spktest.Finalize(XOnlyPubKey(ParseHex(vec["given"]["internalPubkey"].get_str())));
         BOOST_CHECK_EQUAL(HexStr(GetScriptForDestination(spktest.GetOutput())), vec["expected"]["scriptPubKey"].get_str());
-        BOOST_CHECK_EQUAL(EncodeDestination(spktest.GetOutput()), vec["expected"]["bip350Address"].get_str());
+        // S256: the BIP341 vectors carry Bitcoin mainnet ("bc") addresses. Keep
+        // the vectors as published and compare against the same witness
+        // program re-encoded with S256's mainnet HRP.
+        const auto expected_addr{bech32::Decode(vec["expected"]["bip350Address"].get_str())};
+        BOOST_CHECK_EQUAL(expected_addr.hrp, "bc");
+        BOOST_CHECK_EQUAL(EncodeDestination(spktest.GetOutput()), bech32::Encode(expected_addr.encoding, Params().Bech32HRP(), expected_addr.data));
         auto spend_data = spktest.GetSpendData();
         BOOST_CHECK_EQUAL(vec["intermediary"]["merkleRoot"].isNull(), spend_data.merkle_root.IsNull());
         if (!spend_data.merkle_root.IsNull()) {

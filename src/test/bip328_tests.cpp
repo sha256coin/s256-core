@@ -4,6 +4,8 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <base58.h>
+#include <chainparams.h>
 #include <key.h>
 #include <key_io.h>
 #include <musig.h>
@@ -11,6 +13,7 @@
 #include <util/strencodings.h>
 #include <crypto/hex_base.h>
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -85,7 +88,17 @@ BOOST_AUTO_TEST_CASE(valid_keys)
 
         // Check xpub
         std::string xpub = EncodeExtPubKey(extpub);
-        BOOST_CHECK_MESSAGE(xpub == test.expected_aggregate_xpub, "Test vector " << i << ": Synthetic xpub mismatch");
+        // S256: the BIP328 vectors are Bitcoin mainnet xpubs. Keep them as
+        // published and compare against the same payload with S256's mainnet
+        // EXT_PUBLIC_KEY version bytes (src/kernel/chainparams.cpp).
+        std::vector<unsigned char> expected_data;
+        BOOST_REQUIRE(DecodeBase58Check(test.expected_aggregate_xpub, expected_data, BIP32_EXTKEY_WITH_VERSION_SIZE));
+        BOOST_REQUIRE_EQUAL(expected_data.size(), BIP32_EXTKEY_WITH_VERSION_SIZE);
+        constexpr std::array<unsigned char, 4> BITCOIN_XPUB_VERSION{0x04, 0x88, 0xB2, 0x1E};
+        BOOST_CHECK(std::equal(BITCOIN_XPUB_VERSION.begin(), BITCOIN_XPUB_VERSION.end(), expected_data.begin()));
+        const auto& s256_version{Params().Base58Prefix(CChainParams::EXT_PUBLIC_KEY)};
+        std::copy(s256_version.begin(), s256_version.end(), expected_data.begin());
+        BOOST_CHECK_MESSAGE(xpub == EncodeBase58Check(expected_data), "Test vector " << i << ": Synthetic xpub mismatch");
     }
 }
 

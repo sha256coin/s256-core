@@ -44,7 +44,8 @@ BOOST_FIXTURE_TEST_CASE(SubtractFee, TestChain100Setup)
     // leftover input amount which would have been change to the recipient
     // instead of the miner.
     auto check_tx = [&wallet](CAmount leftover_input_amount) {
-        CRecipient recipient{PubKeyDestination({}), 50 * COIN - leftover_input_amount, /*subtract_fee=*/true};
+        // S256: the coinbase input pays 100 COIN (GetBlockSubsidy(), src/validation.cpp)
+        CRecipient recipient{PubKeyDestination({}), 100 * COIN - leftover_input_amount, /*subtract_fee=*/true};
         CCoinControl coin_control;
         coin_control.m_feerate.emplace(10000);
         coin_control.fOverrideFeeRate = true;
@@ -82,36 +83,38 @@ BOOST_FIXTURE_TEST_CASE(wallet_duplicated_preset_inputs_test, TestChain100Setup)
 {
     // Verify that the wallet's Coin Selection process does not include pre-selected inputs twice in a transaction.
 
-    // Add 4 spendable UTXO, 50 BTC each, to the wallet (total balance 200 BTC)
+    // Add 4 spendable UTXO, 100 S256 each, to the wallet (total balance 400 S256).
+    // S256: coinbase subsidy is 100 COIN (GetBlockSubsidy(), src/validation.cpp);
+    // all amounts in this test are doubled from upstream accordingly.
     for (int i = 0; i < 4; i++) CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
     auto wallet = CreateSyncedWallet(*m_node.chain, WITH_LOCK(Assert(m_node.chainman)->GetMutex(), return m_node.chainman->ActiveChain()), coinbaseKey);
 
     LOCK(wallet->cs_wallet);
     auto available_coins = AvailableCoins(*wallet);
     std::vector<COutput> coins = available_coins.All();
-    // Preselect the first 3 UTXO (150 BTC total)
+    // Preselect the first 3 UTXO (300 S256 total)
     std::set<COutPoint> preset_inputs = {coins[0].outpoint, coins[1].outpoint, coins[2].outpoint};
 
     // Try to create a tx that spends more than what preset inputs + wallet selected inputs are covering for.
-    // The wallet can cover up to 200 BTC, and the tx target is 299 BTC.
+    // The wallet can cover up to 400 S256, and the tx target is 598 S256.
     std::vector<CRecipient> recipients{{*Assert(wallet->GetNewDestination(OutputType::BECH32, "dummy")),
-                                           /*nAmount=*/299 * COIN, /*fSubtractFeeFromAmount=*/true}};
+                                           /*nAmount=*/598 * COIN, /*fSubtractFeeFromAmount=*/true}};
     CCoinControl coin_control;
     coin_control.m_allow_other_inputs = true;
     for (const auto& outpoint : preset_inputs) {
         coin_control.Select(outpoint);
     }
 
-    // Attempt to send 299 BTC from a wallet that only has 200 BTC. The wallet should exclude
+    // Attempt to send 598 S256 from a wallet that only has 400 S256. The wallet should exclude
     // the preset inputs from the pool of available coins, realize that there is not enough
-    // money to fund the 299 BTC payment, and fail with "Insufficient funds".
+    // money to fund the 598 S256 payment, and fail with "Insufficient funds".
     //
-    // Even with SFFO, the wallet can only afford to send 200 BTC.
+    // Even with SFFO, the wallet can only afford to send 400 S256.
     // If the wallet does not properly exclude preset inputs from the pool of available coins
     // prior to coin selection, it may create a transaction that does not fund the full payment
     // amount or, through SFFO, incorrectly reduce the recipient's amount by the difference
-    // between the original target and the wrongly counted inputs (in this case 99 BTC)
-    // so that the recipient's amount is no longer equal to the user's selected target of 299 BTC.
+    // between the original target and the wrongly counted inputs (in this case 198 S256)
+    // so that the recipient's amount is no longer equal to the user's selected target of 598 S256.
 
     // First case, use 'subtract_fee_from_outputs=true'
     BOOST_CHECK(!CreateTransaction(*wallet, recipients, /*change_pos=*/std::nullopt, coin_control));

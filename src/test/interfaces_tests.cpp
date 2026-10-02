@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <chainparams.h>
+#include <consensus/consensus.h>
 #include <consensus/validation.h>
 #include <interfaces/chain.h>
 #include <test/util/common.h>
@@ -48,13 +49,14 @@ BOOST_AUTO_TEST_CASE(findBlock)
 
     bool cur_active{false}, next_active{false};
     uint256 next_hash;
-    BOOST_CHECK_EQUAL(active.Height(), 100);
-    BOOST_CHECK(chain->findBlock(active[99]->GetBlockHash(), FoundBlock().inActiveChain(cur_active).nextBlock(FoundBlock().inActiveChain(next_active).hash(next_hash))));
+    // S256: TestChain100Setup mines COINBASE_MATURITY (200) blocks, not 100.
+    BOOST_CHECK_EQUAL(active.Height(), COINBASE_MATURITY);
+    BOOST_CHECK(chain->findBlock(active[COINBASE_MATURITY - 1]->GetBlockHash(), FoundBlock().inActiveChain(cur_active).nextBlock(FoundBlock().inActiveChain(next_active).hash(next_hash))));
     BOOST_CHECK(cur_active);
     BOOST_CHECK(next_active);
-    BOOST_CHECK_EQUAL(next_hash, active[100]->GetBlockHash());
+    BOOST_CHECK_EQUAL(next_hash, active[COINBASE_MATURITY]->GetBlockHash());
     cur_active = next_active = false;
-    BOOST_CHECK(chain->findBlock(active[100]->GetBlockHash(), FoundBlock().inActiveChain(cur_active).nextBlock(FoundBlock().inActiveChain(next_active))));
+    BOOST_CHECK(chain->findBlock(active[COINBASE_MATURITY]->GetBlockHash(), FoundBlock().inActiveChain(cur_active).nextBlock(FoundBlock().inActiveChain(next_active))));
     BOOST_CHECK(cur_active);
     BOOST_CHECK(!next_active);
 

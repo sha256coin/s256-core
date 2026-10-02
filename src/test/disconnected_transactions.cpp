@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 //
 #include <boost/test/unit_test.hpp>
+#include <consensus/consensus.h>
 #include <core_memusage.h>
 #include <kernel/disconnected_transactions.h>
 #include <test/util/setup_common.h>
@@ -15,7 +16,12 @@ BOOST_AUTO_TEST_CASE(disconnectpool_memory_limits)
     // Use the coinbase transactions from TestChain100Setup. It doesn't matter whether these
     // transactions would realistically be in a block together, they just need distinct txids and
     // uniform size for this test to work.
-    std::vector<CTransactionRef> block_vtx(m_coinbase_txns);
+    // S256: TestChain100Setup mines COINBASE_MATURITY (200) blocks; this test's
+    // memory arithmetic is built around 100 uniformly sized transactions, so use
+    // the first 100 (coinbases above height 127 encode their height in one more
+    // byte and would not be uniform).
+    BOOST_REQUIRE_EQUAL(m_coinbase_txns.size(), size_t{COINBASE_MATURITY});
+    std::vector<CTransactionRef> block_vtx(m_coinbase_txns.begin(), m_coinbase_txns.begin() + 100);
     BOOST_CHECK_EQUAL(block_vtx.size(), 100);
 
     // Roughly estimate sizes to sanity check that DisconnectedBlockTransactions::DynamicMemoryUsage

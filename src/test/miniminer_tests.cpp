@@ -576,9 +576,13 @@ BOOST_FIXTURE_TEST_CASE(miniminer_overlap, TestChain100Setup)
     BOOST_CHECK(miniminer_manual.IsReadyToCalculate());
     BOOST_CHECK(miniminer_pool.IsReadyToCalculate());
     for (const auto& sequences : {miniminer_manual.Linearize(), miniminer_pool.Linearize()}) {
-        // tx2 and tx4 selected first: high feerate with nothing to bump
-        BOOST_CHECK_EQUAL(Find(sequences, tx4->GetHash()), 0);
-        BOOST_CHECK_EQUAL(Find(sequences, tx2->GetHash()), 1);
+        // tx2 and tx4 selected first: high feerate with nothing to bump.
+        // S256: they have the same feerate, so MiniMiner orders them by txid
+        // (AncestorFeerateComparator, src/node/mini_miner.cpp); the txids derive
+        // from this chain's coinbases, so the order differs from upstream's.
+        const bool tx4_first{tx4->GetHash() < tx2->GetHash()};
+        BOOST_CHECK_EQUAL(Find(sequences, tx4->GetHash()), tx4_first ? 0 : 1);
+        BOOST_CHECK_EQUAL(Find(sequences, tx2->GetHash()), tx4_first ? 1 : 0);
 
         // tx5 + tx7 CPFP
         BOOST_CHECK_EQUAL(Find(sequences, tx5->GetHash()), 2);
