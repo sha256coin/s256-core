@@ -236,13 +236,18 @@ public:
         consensus.nSubsidyHalvingInterval = 420000;
         consensus.script_flag_exceptions.emplace( // BIP16 exception
             uint256{"00000000dd30457c001f4095d208cc1296b0eed002427aa599874af7a432b105"}, SCRIPT_VERIFY_NONE);
-        consensus.BIP34Height = 21111;
-        consensus.BIP34Hash = uint256{"0000000023b3a96d3484e5abb3755c413e7d41500f8e2a5c3f0dd01299cd8ef8"};
-        consensus.BIP65Height = 581885; // 00000000007f6655f22f98e72ed80d8b06dc761d5da09df0fa1dc4be4f861eb6
-        consensus.BIP66Height = 330776; // 000000002104c8c45e99a8853285a3b592602a3ccde2b832481da85e9e4ba182
-        consensus.CSVHeight = 770112; // 00000000025e930139bac5c6c31a403776da130831ab85be56578f3fa75369bb
-        consensus.SegwitHeight = 834624; // 00000000002b980fcd729daaa248fd9316a5200e9b367f4ff2c42453e84201ca
-        consensus.MinBIP9WarningHeight = 836640; // segwit activation height + miner confirmation window
+        // S256: these were real Bitcoin testnet3's own activation heights
+        // (SegWit at 834624 etc.), unreachable on S256's own testnet chain,
+        // so witness transactions were relayed and templated but every block
+        // carrying them was rejected ("unexpected-witness"). Active from
+        // height 1, matching CTestNet4Params.
+        consensus.BIP34Height = 1;
+        consensus.BIP34Hash = uint256{};
+        consensus.BIP65Height = 1;
+        consensus.BIP66Height = 1;
+        consensus.CSVHeight = 1;
+        consensus.SegwitHeight = 1;
+        consensus.MinBIP9WarningHeight = 0;
         consensus.AuxpowStartHeight = 1; // S256: always active on testnet
         consensus.nAuxpowChainId = 0x53323536;
         consensus.LwmaStartHeight = 1; // S256: always active on testnet
@@ -279,8 +284,10 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].threshold = 1512; // 75%
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].period = 2016;
 
-        consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000017dde1c649f3708d14b6"};
-        consensus.defaultAssumeValid = uint256{"000000007a61e4230b28ac5cb6b5e5a0130de37ac1faf2f8987d2fa6505b67f4"}; // 4842348
+        // S256: were real Bitcoin testnet3's values (block 4842348) -- far
+        // more work than S256's testnet chain will have for a long time.
+        consensus.nMinimumChainWork = uint256{};
+        consensus.defaultAssumeValid = uint256{};
 
         // S256: was byte-for-byte identical to real Bitcoin testnet3's own
         // magic bytes (0x0b110907) -- an S256 testnet node would complete a
