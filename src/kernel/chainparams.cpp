@@ -741,6 +741,14 @@ public:
         base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
 
         bech32_hrp = "s2rt";
+
+        // Upstream's regtest values (v31.1). Used when a regtest node is
+        // started with -minimumchainwork (headers presync); without it that
+        // node fails the commitment_period > 0 assertion.
+        m_headers_sync_params = HeadersSyncParams{
+            .commitment_period = 275,
+            .redownload_buffer_size = 7017, // 7017/275 = ~25.5 commitments
+        };
     }
 };
 
