@@ -145,7 +145,12 @@ bool BlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, s
                 pindexNew->nStatus        = diskindex.nStatus;
                 pindexNew->nTx            = diskindex.nTx;
 
-                if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits, consensusParams)) {
+                // S256: the index does not store the auxpow, so a merge-mined
+                // block's proof of work cannot be rechecked here: its own hash
+                // need not meet the target, only its parent block's does. It
+                // was fully checked, auxpow included, when it was accepted.
+                if (!(pindexNew->nVersion & VERSION_AUXPOW_BIT) &&
+                    !CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits, consensusParams)) {
                     LogError("%s: CheckProofOfWork failed: %s\n", __func__, pindexNew->ToString());
                     return false;
                 }
@@ -1053,8 +1058,9 @@ bool BlockManager::ReadBlock(CBlock& block, const FlatFilePos& pos, const std::o
 
     const auto block_hash{block.GetHash()};
 
-    // Check the header
-    if (!CheckProofOfWork(block_hash, block.nBits, GetConsensus())) {
+    // Check the header. S256: the header-aware check, so a merge-mined
+    // block's auxpow is verified rather than its own hash.
+    if (!CheckProofOfWork(block, GetConsensus())) {
         LogError("Errors in block header at %s while reading block", pos.ToString());
         return false;
     }
