@@ -58,7 +58,8 @@ TIME_GENESIS_BLOCK = 1296688602
 MAX_FUTURE_BLOCK_TIME = 2 * 60 * 60
 
 # Coinbase transaction outputs can only be spent after this number of new blocks (network rule)
-COINBASE_MATURITY = 100
+# S256: 200 (src/consensus/consensus.h)
+COINBASE_MATURITY = 200
 
 # From BIP141
 WITNESS_COMMITMENT_HEADER = b"\xaa\x21\xa9\xed"
@@ -70,6 +71,9 @@ VERSIONBITS_LAST_OLD_BLOCK_VERSION = 4
 MIN_BLOCKS_TO_KEEP = 288
 
 REGTEST_RETARGET_PERIOD = 150
+
+# S256: initial block subsidy, GetBlockSubsidy() in src/validation.cpp
+BLOCK_SUBSIDY = 100 * COIN
 
 REGTEST_N_BITS = 0x207fffff  # difficulty retargeting is disabled in REGTEST chainparams"
 REGTEST_TARGET = 0x7fffff0000000000000000000000000000000000000000000000000000000000
@@ -169,7 +173,7 @@ def script_BIP34_coinbase_height(height):
     return CScript([CScriptNum(height)])
 
 
-def create_coinbase(height, pubkey=None, *, script_pubkey=None, extra_output_script=None, fees=0, nValue=50, halving_period=REGTEST_RETARGET_PERIOD):
+def create_coinbase(height, pubkey=None, *, script_pubkey=None, extra_output_script=None, fees=0, nValue=None, halving_period=REGTEST_RETARGET_PERIOD):
     """Create a coinbase transaction.
 
     If pubkey is passed in, the coinbase output will be a P2PK output;
@@ -181,11 +185,17 @@ def create_coinbase(height, pubkey=None, *, script_pubkey=None, extra_output_scr
     coinbase.nLockTime = height - 1
     coinbase.vin.append(CTxIn(NULL_OUTPOINT, script_BIP34_coinbase_height(height), MAX_SEQUENCE_NONFINAL))
     coinbaseoutput = CTxOut()
-    coinbaseoutput.nValue = nValue * COIN
-    if nValue == 50:
+    # S256: with no explicit nValue, pay the regtest subsidy: 100 COIN
+    # (GetBlockSubsidy() in src/validation.cpp) halving every halving_period
+    # blocks. An explicit nValue is used as-is, as upstream does for any
+    # non-default value (tests use it to build over-paying coinbases).
+    if nValue is None:
+        coinbaseoutput.nValue = BLOCK_SUBSIDY
         halvings = int(height / halving_period)
         coinbaseoutput.nValue >>= halvings
         coinbaseoutput.nValue += fees
+    else:
+        coinbaseoutput.nValue = nValue * COIN
     if pubkey is not None:
         coinbaseoutput.scriptPubKey = key_to_p2pk_script(pubkey)
     elif script_pubkey is not None:

@@ -13,11 +13,18 @@ constants are taken from the source, cited below.
 | Halving interval (main/test/test4/signet) | 420,000 | `src/kernel/chainparams.cpp`, `nSubsidyHalvingInterval` |
 | Halving interval (regtest) | 150 | `src/kernel/chainparams.cpp`, `CRegTestParams` |
 | Coinbase maturity | 200 | `src/consensus/consensus.h`, `COINBASE_MATURITY` |
+| Regtest bech32 HRP (main / test) | `s2rt` (`s2` / `ts2`) | `src/kernel/chainparams.cpp`, `bech32_hrp` |
+| Regtest base58 prefixes, magic, port, genesis time/bits | unchanged from Bitcoin | `src/kernel/chainparams.cpp`, `CRegTestParams` |
+| Mainnet / testnet4 magic | `f1c2a5d8` / `f4c5a8db` | `src/kernel/chainparams.cpp`, `pchMessageStart` |
+| Block spacing | 20 min | `src/kernel/chainparams.cpp`, `nPowTargetSpacing` |
+| Binary names | `sha256coind`, `sha256coin-cli`, `-tx`, `-wallet`, `-util` | `src/CMakeLists.txt`, `OUTPUT_NAME` |
+| Default datadir / pid file | `~/.sha256coin` / `sha256coind.pid` | `src/common/args.cpp`, `src/init.cpp` |
 | `MAX_MONEY` | 84,000,000 COIN | `src/consensus/amount.h` (raised from Bitcoin's 21M, see decision below) |
 
 ## Unit tests (`test_bitcoin`)
 
 Baseline before porting (full run with the exclude list): 14,256 failures.
+After step 1 (subsidy tests + `MAX_MONEY`): **39 failures**, all in the 9 suites below.
 
 | Suite / case | Status | Notes |
 |---|---|---|
@@ -59,12 +66,54 @@ Still on Bitcoin's 21M, to port later:
 
 ## Functional tests (`test/functional`)
 
-Framework not yet ported (step 2). Done so far:
+### Framework (`test/functional/test_framework/`): ported
 
-| Item | Status |
-|---|---|
-| Framework writes `sha256coin.conf` | Done |
-| `feature_auxpow_segwit.py` (S256-native, clean chain) | Passing |
+- bech32 HRPs `s2` / `ts2` / `s2rt`; address constants re-encoded and checked
+  against the node (`validateaddress`, `getdescriptorinfo`)
+- `COINBASE_MATURITY` 200; `create_coinbase()` pays 100 COIN by default (an
+  explicit `nValue` is still used as-is); `BLOCK_SUBSIDY` constant
+- shared cache height `COINBASE_MATURITY + 99` = 299 (upstream 199), so tests
+  start at height 300 instead of 200; 25 mature coinbases per cache address as
+  upstream
+- `MAX_MONEY` 84M; mainnet/testnet4 magic bytes
+- binary names, datadir, pid file, `sha256coin.conf`
+- No change needed: regtest base58 prefixes/WIF, regtest magic, genesis time,
+  `0x207fffff` difficulty (LWMA honours `fPowNoRetargeting`), AuxPoW (blocks
+  without the auxpow bit stay valid)
+
+Not ported (not in the core set): signet magic, `compressor.py` self-test.
+
+### Core set (step 2), 36 runs: 16 pass, 20 fail
+
+Every failure is a Bitcoin value hard-coded in the test itself; none points to
+a node bug.
+
+| Test | Status | Cause |
+|---|---|---|
+| `feature_auxpow_segwit.py` | Passing | S256-native |
+| `mining_getblocktemplate_longpoll.py`, `mining_prioritisetransaction.py` | Passing | |
+| `p2p_blocksonly.py`, `p2p_compactblocks.py`, `p2p_getdata.py`, `p2p_ping.py` | Passing | |
+| `rpc_help.py`, `rpc_net.py` (v1, v2), `rpc_signmessagewithprivkey.py`, `rpc_uptime.py` | Passing | |
+| `wallet_createwallet.py` (+ `--usecli`), `wallet_keypool.py`, `wallet_listtransactions.py` | Passing | |
+| `mining_basic.py`, `rpc_getchaintips.py`, `rpc_misc.py`, `p2p_leak.py` | Failing | Expect tip height 200/201 (now 300/301) |
+| `wallet_basic.py`, `wallet_balance.py`, `wallet_send.py`, `wallet_address_types.py` | Failing | Expect 50-coin coinbase balances |
+| `rpc_blockchain.py` (v1, v2) | Failing | UTXO set totals assume 50-coin subsidy |
+| `feature_segwit.py` (v1, v2), `p2p_segwit.py` | Failing | Spend coinbases that are immature under maturity 200 |
+| `mining_template_verification.py`, `p2p_invalid_block.py` (v1, v2) | Failing | 100-coin "overspend" is a valid S256 subsidy |
+| `rpc_createmultisig.py` | Failing | `bcrt` literal |
+| `rpc_rawtransaction.py` | Failing | Pruning heights assume the 200-block start |
+| `p2p_handshake.py` (v1, v2) | Failing | "24h" limited-peer window is 144 blocks; at S256's 20-min spacing that is 48h (`src/net_processing.cpp:156, 1344`) |
+
+Running: no environment variables needed any more,
+`python3 test/functional/test_runner.py <tests>` from `build-release`.
+
+### Also known
+
+- `feature_assumeutxo.py`: regtest `m_assumeutxo_data` (heights 110/200/299 in
+  `src/kernel/chainparams.cpp`) look like Bitcoin's regtest snapshots (not yet
+  verified). If so their blocks cannot exist on S256's regtest chain and the
+  test needs S256 snapshot values in chainparams (node code): to be reported
+  when that test is ported, not changed here.
 
 ## Skipped tests
 

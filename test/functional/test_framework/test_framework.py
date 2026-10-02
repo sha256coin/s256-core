@@ -22,6 +22,7 @@ import time
 
 from .address import create_deterministic_address_bcrt1_p2tr_op_true
 from .authproxy import JSONRPCException
+from .blocktools import COINBASE_MATURITY
 from . import coverage
 from .messages import CAddress
 from .p2p import NetworkThread
@@ -41,6 +42,11 @@ from .util import (
     wait_until_helper_internal,
     wallet_importprivkey,
 )
+
+
+# Height of the shared test cache: upstream's 199 is COINBASE_MATURITY + 99,
+# so that the first 100 blocks (25 per cache address) are mature.
+CACHE_HEIGHT = COINBASE_MATURITY + 99
 
 
 class TestStatus(Enum):
@@ -387,7 +393,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
             self.import_deterministic_coinbase_privkeys()
         if not self.setup_clean_chain:
             for n in self.nodes:
-                assert_equal(n.getblockchaininfo()["blocks"], 199)
+                assert_equal(n.getblockchaininfo()["blocks"], CACHE_HEIGHT)
             # To ensure that all nodes are out of IBD, the most recent block
             # must have a timestamp not too old (see IsInitialBlockDownload()).
             self.log.debug('Generate a block with current time')
@@ -396,7 +402,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
             for n in self.nodes:
                 n.submitblock(block)
                 chain_info = n.getblockchaininfo()
-                assert_equal(chain_info["blocks"], 200)
+                assert_equal(chain_info["blocks"], CACHE_HEIGHT + 1)
                 assert_equal(chain_info["initialblockdownload"], False)
 
     def import_deterministic_coinbase_privkeys(self):
@@ -888,7 +894,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
     def _initialize_chain(self):
         """Initialize a pre-mined blockchain for use by the test.
 
-        Create a cache of a 199-block-long chain
+        Create a cache of a CACHE_HEIGHT-block-long chain
         Afterward, create num_nodes copies from the cache."""
 
         CACHE_NODE_ID = 0  # Use node 0 to create the cache for all other nodes
@@ -923,22 +929,25 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
             # Set a time in the past, so that blocks don't end up in the future
             cache_node.setmocktime(cache_node.getblockheader(cache_node.getbestblockhash())['time'])
 
-            # Create a 199-block-long chain; each of the 3 first nodes
-            # gets 25 mature blocks and 25 immature.
+            # Create a CACHE_HEIGHT-block-long chain (299 for S256, 199 upstream)
+            # in rounds of 25 blocks; each of the 3 first nodes gets 25 mature
+            # blocks and 50 immature (S256's COINBASE_MATURITY is 200, so the
+            # first 100 blocks are the mature ones, as upstream).
             # The 4th address gets 25 mature and only 24 immature blocks so that the very last
             # block in the cache does not age too much (have an old tip age).
             # This is needed so that we are out of IBD when the test starts,
             # see the tip age check in IsInitialBlockDownload().
             gen_addresses = [k.address for k in TestNode.PRIV_KEYS][:3] + [create_deterministic_address_bcrt1_p2tr_op_true()[0]]
             assert_equal(len(gen_addresses), 4)
-            for i in range(8):
+            rounds = (CACHE_HEIGHT + 1) // 25
+            for i in range(rounds):
                 self.generatetoaddress(
                     cache_node,
-                    nblocks=25 if i != 7 else 24,
+                    nblocks=25 if i != rounds - 1 else 24,
                     address=gen_addresses[i % len(gen_addresses)],
                 )
 
-            assert_equal(cache_node.getblockchaininfo()["blocks"], 199)
+            assert_equal(cache_node.getblockchaininfo()["blocks"], CACHE_HEIGHT)
 
             # Shut it down, and clean up cache directories:
             self.stop_nodes()

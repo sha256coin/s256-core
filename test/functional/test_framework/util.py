@@ -330,11 +330,19 @@ def get_binary_paths(config):
     }
     # Set paths to bitcoin core binaries allowing overrides with environment
     # variables.
+    # S256: OUTPUT_NAME of these targets in src/CMakeLists.txt
+    output_names = {
+        "bitcoind": "sha256coind",
+        "bitcoin-cli": "sha256coin-cli",
+        "bitcoin-util": "sha256coin-util",
+        "bitcoin-tx": "sha256coin-tx",
+        "bitcoin-wallet": "sha256coin-wallet",
+    }
     for binary, env_variable_name in binaries.items():
         default_filename = os.path.join(
             config["environment"]["BUILDDIR"],
             "bin",
-            binary + config["environment"]["EXEEXT"],
+            output_names.get(binary, binary) + config["environment"]["EXEEXT"],
         )
         setattr(paths, env_variable_name.lower(), os.getenv(env_variable_name, default=default_filename))
     # BITCOIN_CMD environment variable can be specified to invoke bitcoin
@@ -604,13 +612,13 @@ def get_temp_default_datadir(temp_dir: pathlib.Path) -> tuple[dict, pathlib.Path
     temp_dir, as well as the complete path it would return."""
     if platform.system() == "Windows":
         env = dict(APPDATA=str(temp_dir))
-        datadir = temp_dir / "Bitcoin"
+        datadir = temp_dir / "SHA256Coin"  # S256: GetDefaultDataDir(), src/common/args.cpp
     else:
         env = dict(HOME=str(temp_dir))
         if platform.system() == "Darwin":
-            datadir = temp_dir / "Library/Application Support/Bitcoin"
+            datadir = temp_dir / "Library/Application Support/SHA256Coin"
         else:
-            datadir = temp_dir / ".bitcoin"
+            datadir = temp_dir / ".sha256coin"
     return env, datadir
 
 
