@@ -1217,6 +1217,10 @@ static RPCHelpMan createauxblock()
         throw JSONRPCError(RPC_OUT_OF_MEMORY, "Could not create new block template");
     }
     auto block = std::make_shared<CBlock>(block_template->getBlock());
+    // The template comes back with hashMerkleRoot unset (upstream fills it in
+    // only at submitSolution time), so it must be computed here, before the
+    // hash below commits to the header.
+    block->hashMerkleRoot = BlockMerkleRoot(*block);
     // Set VERSION_AUXPOW_BIT before computing the hash handed out below: this
     // hash is what the parent pool commits to in its merge-mining tag, and
     // it must exactly match the hash CheckAuxPow recomputes at submission
