@@ -340,18 +340,7 @@ public:
         m_is_mockable_chain = false;
 
         m_assumeutxo_data = {
-            {
-                .height = 2'500'000,
-                .hash_serialized = AssumeutxoHash{uint256{"f841584909f68e47897952345234e37fcd9128cd818f41ee6c3ca68db8071be7"}},
-                .m_chain_tx_count = 66484552,
-                .blockhash = uint256{"0000000000000093bcb68c03a9a168ae252572d348a2eaeba2cdf9231d73206f"},
-            },
-            {
-                .height = 4'840'000,
-                .hash_serialized = AssumeutxoHash{uint256{"ce6bb677bb2ee9789c4a1c9d73e6683c53fc20e8fdbedbdaaf468982a0c8db2a"}},
-                .m_chain_tx_count = 536078574,
-                .blockhash = uint256{"00000000000000f4971a7fb37fbdff89315b69a2e1920c467654a382f0d64786"},
-            }
+            // S256: no assumeutxo snapshots yet (were real Bitcoin ones)
         };
 
         chainTxData = ChainTxData{
@@ -411,8 +400,10 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].threshold = 1512; // 75%
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].period = 2016;
 
-        consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000009a0fe15d0177d086304"};
-        consensus.defaultAssumeValid = uint256{"0000000002368b1e4ee27e2e85676ae6f9f9e69579b29093e9a82c170bf7cf8a"}; // 123613
+        // S256: were real Bitcoin testnet4's values (block 123613) -- far
+        // more work than S256's testnet4 chain will have for a long time.
+        consensus.nMinimumChainWork = uint256{};
+        consensus.defaultAssumeValid = uint256{};
 
         // S256: was byte-for-byte identical to real Bitcoin testnet4's own
         // magic bytes (0x1c163f28) -- same class of bug already fixed for
@@ -468,18 +459,7 @@ public:
         m_is_mockable_chain = false;
 
         m_assumeutxo_data = {
-            {
-                .height = 90'000,
-                .hash_serialized = AssumeutxoHash{uint256{"784fb5e98241de66fdd429f4392155c9e7db5c017148e66e8fdbc95746f8b9b5"}},
-                .m_chain_tx_count = 11347043,
-                .blockhash = uint256{"0000000002ebe8bcda020e0dd6ccfbdfac531d2f6a81457191b99fc2df2dbe3b"},
-            },
-            {
-                .height = 120'000,
-                .hash_serialized = AssumeutxoHash{uint256{"10b05d05ad468d0971162e1b222a4aa66caca89da2bb2a93f8f37fb29c4794b0"}},
-                .m_chain_tx_count = 14141057,
-                .blockhash = uint256{"000000000bd2317e51b3c5794981c35ba894ce27d3e772d5c39ecd9cbce01dc8"},
-            }
+            // S256: no assumeutxo snapshots yet (were real Bitcoin ones)
         };
 
         chainTxData = ChainTxData{
