@@ -13,7 +13,7 @@ constants are taken from the source, cited below.
 | Halving interval (main/test/test4/signet) | 420,000 | `src/kernel/chainparams.cpp`, `nSubsidyHalvingInterval` |
 | Halving interval (regtest) | 150 | `src/kernel/chainparams.cpp`, `CRegTestParams` |
 | Coinbase maturity | 200 | `src/consensus/consensus.h`, `COINBASE_MATURITY` |
-| `MAX_MONEY` | 21,000,000 COIN (unchanged from Bitcoin) | `src/consensus/amount.h` |
+| `MAX_MONEY` | 84,000,000 COIN | `src/consensus/amount.h` (raised from Bitcoin's 21M, see decision below) |
 
 ## Unit tests (`test_bitcoin`)
 
@@ -22,7 +22,8 @@ Baseline before porting (full run with the exclude list): 14,256 failures.
 | Suite / case | Status | Notes |
 |---|---|---|
 | `validation_tests/block_subsidy_test` | Ported | Initial subsidy 50 -> 100 COIN |
-| `validation_tests/subsidy_limit_test` | **Blocked: open question** | S256 total issuance (83,999,999.95 COIN) exceeds `MAX_MONEY` (21M) from height 210,000; the test's `MoneyRange(nSum)` check fails there. Needs a decision on `MAX_MONEY` (consensus), see below |
+| `validation_tests/subsidy_limit_test` | Ported | Cap 50 -> 100 COIN; range 14M -> 28M blocks (doubled halving interval); expected total 8,399,999,995,380,000 sat |
+| `transaction_tests/tx_invalid` | Ported | `MAX_MONEY + 1` vectors re-encoded at 84M (failed after the `MAX_MONEY` change) |
 | `spend_tests` (10) | Failing | Step 3 |
 | `script_standard_tests` (8) | Failing | Step 3 |
 | `util_tests` (6) | Failing | Step 3 |
@@ -33,17 +34,28 @@ Baseline before porting (full run with the exclude list): 14,256 failures.
 | `interfaces_tests` (2) | Failing | Step 3 |
 | `wallet_tests` (1) | Failing | Step 3 |
 
-### Open question: `MAX_MONEY` vs S256 supply
+### Decision: `MAX_MONEY` raised to 84M (2026-10-02)
 
 S256 issues 100 COIN per block halving every 420,000 blocks, so total supply
-approaches 84M COIN, but `MAX_MONEY` is Bitcoin's 21M. Total supply passes 21M
-at height 210,000. `MAX_MONEY` is enforced per transaction
-(`src/consensus/tx_check.cpp:29-32`, `src/consensus/tx_verify.cpp:186`) and in
-wallet balance sums (`src/wallet/receive.cpp:46`, `:94`,
-`src/wallet/wallet.cpp:1696`), so after that height a transaction moving more
-than 21M COIN would be invalid and a wallet holding more than 21M would throw.
-Litecoin, with the same 4x supply, set `MAX_MONEY` to 84M. Raising it is a
-consensus change (it relaxes a rule, so a hard fork) and is not done here.
+approaches 84M COIN (83,999,999.95), but `MAX_MONEY` was Bitcoin's 21M, which
+supply passes at height 210,000. After that, transactions over 21M would have
+been invalid (`src/consensus/tx_check.cpp`, `src/consensus/tx_verify.cpp`) and
+wallet balance sums over 21M would throw (`src/wallet/receive.cpp`,
+`src/wallet/wallet.cpp`).
+
+Decision (option A): set `MAX_MONEY` to 84M with no activation height, on
+branch `fix/max-money`, shipping with the 17,500 release. No fork logic is
+needed: until supply exceeds 21M no transaction can exceed it. The IPC
+interface's `maxMoney` (`src/ipc/capnp/mining.capnp`) changed with it.
+
+Still on Bitcoin's 21M, to port later:
+- `src/test/data/tx_valid.json` "MAX_MONEY output" vectors (still pass, but no
+  longer test the boundary; an 84M vector needs re-signing)
+- `src/test/compress_tests.cpp` 21M round-trip case (passes, not a boundary)
+- `test/functional/test_framework/messages.py` `MAX_MONEY` and
+  `CTransaction.is_valid()`, `compressor.py` (step 2)
+- functional tests using `MAX_MONEY`: `feature_assumeutxo.py`,
+  `mempool_limit.py`, `p2p_ibd_txrelay.py`, `mempool_accept.py`
 
 ## Functional tests (`test/functional`)
 

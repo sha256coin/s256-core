@@ -57,13 +57,15 @@ BOOST_AUTO_TEST_CASE(subsidy_limit_test)
 {
     const auto chainParams = CreateChainParams(*m_node.args, ChainType::MAIN);
     CAmount nSum = 0;
-    for (int nHeight = 0; nHeight < 14000000; nHeight += 1000) {
+    // S256: twice Bitcoin's range, matching the doubled halving interval
+    // (420,000, chainparams.cpp), so the whole schedule is covered.
+    for (int nHeight = 0; nHeight < 28000000; nHeight += 1000) {
         CAmount nSubsidy = GetBlockSubsidy(nHeight, chainParams->GetConsensus());
-        BOOST_CHECK(nSubsidy <= 50 * COIN);
+        BOOST_CHECK(nSubsidy <= 100 * COIN); // S256: GetBlockSubsidy() in validation.cpp
         nSum += nSubsidy * 1000;
         BOOST_CHECK(MoneyRange(nSum));
     }
-    BOOST_CHECK_EQUAL(nSum, CAmount{2099999997690000});
+    BOOST_CHECK_EQUAL(nSum, CAmount{8399999995380000});
 }
 
 BOOST_AUTO_TEST_CASE(signet_parse_tests)
