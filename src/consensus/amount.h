@@ -22,8 +22,14 @@ static constexpr CAmount COIN = 100000000;
  * validation code, the exact value of the MAX_MONEY constant is consensus
  * critical; in unusual circumstances like a(nother) overflow bug that allowed
  * for the creation of coins out of thin air modification could lead to a fork.
+ *
+ * S256: 84,000,000 rather than Bitcoin's 21,000,000. S256's issuance (100
+ * COIN, halving every 420,000 blocks) approaches 84M, and total supply passes
+ * 21M at height 210,000; with a 21M cap, transactions and wallet balance sums
+ * above it would become invalid from then on. Raising it needs no activation
+ * logic: until supply exceeds 21M no transaction can exceed it either.
  * */
-static constexpr CAmount MAX_MONEY = 21000000 * COIN;
+static constexpr CAmount MAX_MONEY = 84000000 * COIN;
 inline bool MoneyRange(const CAmount& nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 
 #endif // BITCOIN_CONSENSUS_AMOUNT_H
