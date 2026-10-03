@@ -66,7 +66,9 @@ public:
     CTransactionRef coinbaseTx;
 
     /** Merkle branch proving coinbaseTx is included in the parent block's
-     * own transaction merkle tree (hashMerkleRoot of parentBlock). */
+     * own transaction merkle tree (hashMerkleRoot of parentBlock), at
+     * position 0: nIndex must be 0, so the tagged transaction is the parent's
+     * coinbase. */
     std::vector<uint256> vMerkleBranch;
     int nIndex;
 

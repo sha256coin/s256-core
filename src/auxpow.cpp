@@ -75,6 +75,18 @@ bool CAuxPow::CheckAuxPow(const uint256& hashAuxBlock, unsigned int nBits, int n
                               "auxpow parent coinbase transaction has no inputs");
     }
 
+    // The tagged transaction must be the parent block's coinbase, i.e. leaf 0
+    // of the parent's transaction merkle tree. Otherwise the tag could sit in
+    // an ordinary transaction that anyone can get into a block of any SHA-256
+    // chain, and that chain's work would mine S256 blocks for the price of a
+    // transaction fee. Namecoin ignores the serialized index and always
+    // verifies at 0; S256 rejects any other value as well, so the serialized
+    // proof cannot be malleated.
+    if (nIndex != 0) {
+        return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "auxpow-coinbase-not-first",
+                              "auxpow parent coinbase merkle branch index is not 0");
+    }
+
     // --- Chain merkle branch bounds --------------------------------------
     if (vChainMerkleBranch.size() > MAX_CHAIN_MERKLE_BRANCH_LENGTH) {
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "auxpow-chain-merkle-branch-too-long",
@@ -173,7 +185,7 @@ bool CAuxPow::CheckAuxPow(const uint256& hashAuxBlock, unsigned int nBits, int n
 
     // --- Coinbase merkle branch: coinbaseTx -> parentBlock.hashMerkleRoot -
     const uint256 coinbaseHash = coinbaseTx->GetHash().ToUint256();
-    const uint256 computedParentRoot = CheckMerkleBranch(coinbaseHash, vMerkleBranch, nIndex);
+    const uint256 computedParentRoot = CheckMerkleBranch(coinbaseHash, vMerkleBranch, 0);
     if (computedParentRoot != parentBlock.hashMerkleRoot) {
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "auxpow-coinbase-merkle-mismatch",
                               "auxpow coinbase merkle branch does not connect to the parent block's merkle root");

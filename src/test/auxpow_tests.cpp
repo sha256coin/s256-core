@@ -8,6 +8,7 @@
 #include <chainparams.h>
 #include <consensus/merkle.h>
 #include <consensus/validation.h>
+#include <hash.h>
 #include <node/miner.h>
 #include <pow.h>
 #include <primitives/block.h>
@@ -72,10 +73,16 @@ struct AuxPowTestingSetup : public RegTestingSetup {
     // single-transaction block consists of just `coinbaseTx`.
     CPureBlockHeader MineParentHeader(const CTransactionRef& coinbaseTx, unsigned int nBits)
     {
+        return MineParentHeader(coinbaseTx->GetHash().ToUint256(), nBits);
+    }
+
+    // Same, for a parent block with the given transaction merkle root.
+    CPureBlockHeader MineParentHeader(const uint256& merkleRoot, unsigned int nBits)
+    {
         CPureBlockHeader header;
         header.nVersion = 1;
         header.hashPrevBlock = uint256(); // arbitrary — unused by CheckAuxPow
-        header.hashMerkleRoot = coinbaseTx->GetHash().ToUint256();
+        header.hashMerkleRoot = merkleRoot;
         header.nTime = 1700000000;
         header.nBits = nBits;
         header.nNonce = 0;
@@ -100,6 +107,17 @@ struct AuxPowTestingSetup : public RegTestingSetup {
         }
         vch.push_back(0x52); // arbitrary suffix byte
         return CScript(vch.begin(), vch.end());
+    }
+
+    // A parent-chain transaction with the given scriptSig: a coinbase by
+    // default, or an ordinary transaction spending `prevout`.
+    CTransactionRef ParentTx(const CScript& scriptSig,
+                             const COutPoint& prevout = COutPoint(Txid::FromUint256(uint256()), 0xffffffff))
+    {
+        CMutableTransaction tx;
+        tx.vin.emplace_back(prevout, scriptSig, 0);
+        tx.vout.emplace_back(0, CScript() << OP_TRUE);
+        return MakeTransactionRef(std::move(tx));
     }
 
     // A fully valid CAuxPow proving `hashAuxBlock` against `nBits`, using a
@@ -287,6 +305,142 @@ BOOST_AUTO_TEST_CASE(auxpow_oversized_chain_branch_rejected)
     BlockValidationState state;
     BOOST_CHECK(!auxpow.CheckAuxPow(hashAuxBlock, block->nBits, params.nAuxpowChainId, params, state));
     BOOST_CHECK_EQUAL(state.GetRejectReason(), "auxpow-chain-merkle-branch-too-long");
+}
+
+BOOST_AUTO_TEST_CASE(auxpow_tagged_tx_not_coinbase_rejected)
+{
+    // The merge-mining tag in an ordinary transaction at parent position 1,
+    // behind an untagged coinbase. With the proof's nIndex = 1 this used to be
+    // accepted, letting anyone mine S256 blocks with another chain's work for
+    // the price of a transaction fee.
+    auto block = AuxBlockCandidate(10);
+    const uint256 hashAuxBlock = block->GetHash();
+    const Consensus::Params& params = Params().GetConsensus();
+
+    const auto parentCoinbase = ParentTx(BuildTaggedScriptSig(uint256(), 1, 0, /*includeTag=*/false));
+    const auto tagged = ParentTx(BuildTaggedScriptSig(hashAuxBlock, 1, 0),
+                                 COutPoint(Txid::FromUint256(uint256{uint8_t{1}}), 3));
+    CAuxPow auxpow;
+    auxpow.coinbaseTx = tagged;
+    auxpow.vMerkleBranch = {parentCoinbase->GetHash().ToUint256()};
+    auxpow.nIndex = 1;
+    auxpow.nChainIndex = 0;
+    auxpow.parentBlock = MineParentHeader(Hash(parentCoinbase->GetHash().ToUint256(), tagged->GetHash().ToUint256()),
+                                          block->nBits);
+
+    BlockValidationState state;
+    BOOST_CHECK(!auxpow.CheckAuxPow(hashAuxBlock, block->nBits, params.nAuxpowChainId, params, state));
+    BOOST_CHECK_EQUAL(state.GetRejectReason(), "auxpow-coinbase-not-first");
+
+    // Claiming position 0 instead does not connect to the parent's merkle root.
+    auxpow.nIndex = 0;
+    state = BlockValidationState{};
+    BOOST_CHECK(!auxpow.CheckAuxPow(hashAuxBlock, block->nBits, params.nAuxpowChainId, params, state));
+    BOOST_CHECK_EQUAL(state.GetRejectReason(), "auxpow-coinbase-merkle-mismatch");
+
+    // End to end, as submitauxblock submits it.
+    auxpow.nIndex = 1;
+    block->auxpow = std::make_shared<CAuxPow>(auxpow);
+    const uint256 tip_before = WITH_LOCK(::cs_main, return m_node.chainman->ActiveTip()->GetBlockHash());
+    BOOST_CHECK(!m_node.chainman->ProcessNewBlock(block, /*force_processing=*/true, /*min_pow_checked=*/true, /*new_block=*/nullptr));
+    BOOST_CHECK(WITH_LOCK(::cs_main, return m_node.chainman->ActiveTip()->GetBlockHash()) == tip_before);
+}
+
+BOOST_AUTO_TEST_CASE(auxpow_coinbase_with_merkle_branch_accepted)
+{
+    // The normal case for a real parent block: the tagged coinbase at
+    // position 0 with a non-empty branch to the parent's merkle root.
+    auto block = AuxBlockCandidate(11);
+    const uint256 hashAuxBlock = block->GetHash();
+    const Consensus::Params& params = Params().GetConsensus();
+
+    const auto coinbase = ParentTx(BuildTaggedScriptSig(hashAuxBlock, 1, 0));
+    const auto other = ParentTx(CScript() << OP_TRUE, COutPoint(Txid::FromUint256(uint256{uint8_t{1}}), 0));
+    CAuxPow auxpow;
+    auxpow.coinbaseTx = coinbase;
+    auxpow.vMerkleBranch = {other->GetHash().ToUint256()};
+    auxpow.nIndex = 0;
+    auxpow.nChainIndex = 0;
+    auxpow.parentBlock = MineParentHeader(Hash(coinbase->GetHash().ToUint256(), other->GetHash().ToUint256()),
+                                          block->nBits);
+
+    BlockValidationState state;
+    BOOST_CHECK(auxpow.CheckAuxPow(hashAuxBlock, block->nBits, params.nAuxpowChainId, params, state));
+    BOOST_CHECK(state.IsValid());
+}
+
+BOOST_AUTO_TEST_CASE(auxpow_one_parent_proves_one_s256_block)
+{
+    // Two competing S256 blocks committed in the same merge-mining tree
+    // (size 4). Only the block at the slot expected for S256's chain ID and
+    // the tag's nonce can use the parent's work.
+    auto blockA = AuxBlockCandidate(12);
+    auto blockB = AuxBlockCandidate(13);
+    const uint256 hashA = blockA->GetHash();
+    const uint256 hashB = blockB->GetHash();
+    BOOST_REQUIRE(hashA != hashB);
+    const Consensus::Params& params = Params().GetConsensus();
+
+    constexpr uint32_t nonce{7};
+    const int expected = CAuxPow::GetExpectedIndex(nonce, params.nAuxpowChainId, 2);
+    for (int slotB = 0; slotB < 4; ++slotB) {
+        if (slotB == expected) continue;
+        std::vector<uint256> leaves(4, uint256{uint8_t{0x77}});
+        leaves[expected] = hashA;
+        leaves[slotB] = hashB;
+        const uint256 n01 = Hash(leaves[0], leaves[1]);
+        const uint256 n23 = Hash(leaves[2], leaves[3]);
+        const auto branch = [&](int i) {
+            return std::vector<uint256>{leaves[i ^ 1], i < 2 ? n23 : n01};
+        };
+        const auto coinbase = ParentTx(BuildTaggedScriptSig(Hash(n01, n23), 4, nonce));
+
+        CAuxPow auxpow;
+        auxpow.coinbaseTx = coinbase;
+        auxpow.nIndex = 0;
+        auxpow.parentBlock = MineParentHeader(coinbase, blockA->nBits);
+
+        auxpow.vChainMerkleBranch = branch(slotB);
+        auxpow.nChainIndex = slotB;
+        BlockValidationState state;
+        BOOST_CHECK(!auxpow.CheckAuxPow(hashB, blockB->nBits, params.nAuxpowChainId, params, state));
+        BOOST_CHECK_EQUAL(state.GetRejectReason(), "auxpow-wrong-index");
+
+        // B can't borrow A's slot either.
+        auxpow.vChainMerkleBranch = branch(expected);
+        auxpow.nChainIndex = expected;
+        state = BlockValidationState{};
+        BOOST_CHECK(!auxpow.CheckAuxPow(hashB, blockB->nBits, params.nAuxpowChainId, params, state));
+        BOOST_CHECK_EQUAL(state.GetRejectReason(), "auxpow-chain-merkle-mismatch");
+
+        state = BlockValidationState{};
+        BOOST_CHECK(auxpow.CheckAuxPow(hashA, blockA->nBits, params.nAuxpowChainId, params, state));
+    }
+}
+
+BOOST_AUTO_TEST_CASE(auxpow_duplicate_tag_rejected)
+{
+    // Two merge-mining tags in one parent coinbase, one per S256 block.
+    // Neither may use the parent's work.
+    auto blockA = AuxBlockCandidate(14);
+    auto blockB = AuxBlockCandidate(15);
+    const Consensus::Params& params = Params().GetConsensus();
+
+    CScript scriptSig = BuildTaggedScriptSig(blockA->GetHash(), 1, 0);
+    const CScript second = BuildTaggedScriptSig(blockB->GetHash(), 1, 0);
+    scriptSig.insert(scriptSig.end(), second.begin(), second.end());
+    const auto coinbase = ParentTx(scriptSig);
+
+    CAuxPow auxpow;
+    auxpow.coinbaseTx = coinbase;
+    auxpow.nIndex = 0;
+    auxpow.nChainIndex = 0;
+    auxpow.parentBlock = MineParentHeader(coinbase, blockA->nBits);
+    for (const auto& block : {blockA, blockB}) {
+        BlockValidationState state;
+        BOOST_CHECK(!auxpow.CheckAuxPow(block->GetHash(), block->nBits, params.nAuxpowChainId, params, state));
+        BOOST_CHECK_EQUAL(state.GetRejectReason(), "auxpow-multiple-merge-mining-tags");
+    }
 }
 
 BOOST_AUTO_TEST_CASE(auxpow_header_hash_independent_of_auxpow)
