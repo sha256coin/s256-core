@@ -9,7 +9,7 @@
  * network protocol versioning
  */
 
-static const int PROTOCOL_VERSION = 70016;
+static const int PROTOCOL_VERSION = 70100;
 
 //! initial proto version, to be increased after version/verack negotiation
 static const int INIT_PROTO_VERSION = 209;
@@ -34,5 +34,9 @@ static const int INVALID_CB_NO_BAN_VERSION = 70015;
 
 //! "wtxidrelay" message type for wtxid-based relay starts with this version
 static const int WTXID_RELAY_VERSION = 70016;
+
+//! S256: "headers" messages are limited by size as well as count (merge-mined
+//! headers carry an auxpow); see THRESHOLD_HEADERS_SIZE.
+static const int SIZE_HEADERS_LIMIT_VERSION = 70100;
 
 #endif // BITCOIN_NODE_PROTOCOL_VERSION_H

@@ -49,6 +49,15 @@ static const unsigned int MAX_CMPCTBLOCKS_INFLIGHT_PER_BLOCK = 3;
 /** Number of headers sent in one getheaders result. We rely on the assumption that if a peer sends
  *  less than this number, we reached its tip. Changing this value is a protocol upgrade. */
 static const unsigned int MAX_HEADERS_RESULTS = 2000;
+/** S256: merge-mined headers carry an auxpow of any size. A "headers" message
+ *  stops at the header that reaches this many bytes, and from
+ *  SIZE_HEADERS_LIMIT_VERSION a message that reaches it is taken to mean the
+ *  peer has more, like one with MAX_HEADERS_RESULTS headers. One header on
+ *  the active chain is at most ~1 MB (the auxpow counts towards the block
+ *  weight at 4 WU per byte), so messages stay below
+ *  MAX_PROTOCOL_MESSAGE_LENGTH. Header announcements over this size fall back
+ *  to an inv. */
+static const unsigned int THRESHOLD_HEADERS_SIZE = 2'000'000;
 
 struct CNodeStateStats {
     int nSyncHeight = -1;
@@ -92,6 +101,9 @@ public:
         //! Number of headers sent in one getheaders message result (this is
         //! a test-only option).
         uint32_t max_headers_result{MAX_HEADERS_RESULTS};
+        //! Size of a "headers" message at which it is considered full
+        //! (THRESHOLD_HEADERS_SIZE; this is a test-only option).
+        size_t threshold_headers_size{THRESHOLD_HEADERS_SIZE};
         //! Whether private broadcast is used for sending transactions.
         bool private_broadcast{DEFAULT_PRIVATE_BROADCAST};
     };

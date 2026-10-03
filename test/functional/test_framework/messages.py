@@ -727,8 +727,46 @@ class CTransaction:
             % (self.version, repr(self.vin), repr(self.vout), repr(self.wit), self.nLockTime)
 
 
+VERSION_AUXPOW_BIT = 1 << 8
+
+
+class CAuxPow:
+    """S256 merge-mining proof (src/auxpow.h). parentBlock is a pure 80-byte
+    header: it never carries an auxpow of its own."""
+    __slots__ = ("coinbaseTx", "vMerkleBranch", "nIndex", "vChainMerkleBranch",
+                 "nChainIndex", "parentBlock")
+
+    def __init__(self):
+        self.coinbaseTx = CTransaction()
+        self.vMerkleBranch = []
+        self.nIndex = 0
+        self.vChainMerkleBranch = []
+        self.nChainIndex = 0
+        self.parentBlock = CBlockHeader()
+
+    def deserialize(self, f):
+        self.coinbaseTx = CTransaction()
+        self.coinbaseTx.deserialize(f)
+        self.vMerkleBranch = deser_uint256_vector(f)
+        self.nIndex = int.from_bytes(f.read(4), "little", signed=True)
+        self.vChainMerkleBranch = deser_uint256_vector(f)
+        self.nChainIndex = int.from_bytes(f.read(4), "little", signed=True)
+        self.parentBlock = CBlockHeader()
+        self.parentBlock.deserialize_pure(f)
+
+    def serialize(self):
+        return (self.coinbaseTx.serialize_with_witness()
+                + ser_uint256_vector(self.vMerkleBranch) + self.nIndex.to_bytes(4, "little", signed=True)
+                + ser_uint256_vector(self.vChainMerkleBranch) + self.nChainIndex.to_bytes(4, "little", signed=True)
+                + self.parentBlock._serialize_header())
+
+    def __repr__(self):
+        return "CAuxPow(coinbaseTx=%s nIndex=%i nChainIndex=%i parentBlock=%s)" \
+            % (repr(self.coinbaseTx), self.nIndex, self.nChainIndex, repr(self.parentBlock))
+
+
 class CBlockHeader:
-    __slots__ = ("hashMerkleRoot", "hashPrevBlock", "nBits", "nNonce",
+    __slots__ = ("auxpow", "hashMerkleRoot", "hashPrevBlock", "nBits", "nNonce",
                  "nTime", "nVersion")
 
     def __init__(self, header=None):
@@ -741,6 +779,7 @@ class CBlockHeader:
             self.nTime = header.nTime
             self.nBits = header.nBits
             self.nNonce = header.nNonce
+            self.auxpow = header.auxpow
 
     def set_null(self):
         self.nVersion = 4
@@ -749,17 +788,30 @@ class CBlockHeader:
         self.nTime = 0
         self.nBits = 0
         self.nNonce = 0
+        self.auxpow = None
 
-    def deserialize(self, f):
+    def deserialize_pure(self, f):
+        """The 80-byte header only."""
         self.nVersion = int.from_bytes(f.read(4), "little", signed=True)
         self.hashPrevBlock = deser_uint256(f)
         self.hashMerkleRoot = deser_uint256(f)
         self.nTime = int.from_bytes(f.read(4), "little")
         self.nBits = int.from_bytes(f.read(4), "little")
         self.nNonce = int.from_bytes(f.read(4), "little")
+        self.auxpow = None
+
+    def deserialize(self, f):
+        self.deserialize_pure(f)
+        if self.nVersion & VERSION_AUXPOW_BIT:
+            self.auxpow = CAuxPow()
+            self.auxpow.deserialize(f)
 
     def serialize(self):
-        return self._serialize_header()
+        r = self._serialize_header()
+        if self.nVersion & VERSION_AUXPOW_BIT:
+            assert self.auxpow is not None, "auxpow bit set without an auxpow"
+            r += self.auxpow.serialize()
+        return r
 
     def _serialize_header(self):
         r = b""
@@ -782,9 +834,9 @@ class CBlockHeader:
         return uint256_from_str(hash256(self._serialize_header()))
 
     def __repr__(self):
-        return "CBlockHeader(nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x)" \
+        return "CBlockHeader(nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x auxpow=%s)" \
             % (self.nVersion, self.hashPrevBlock, self.hashMerkleRoot,
-               time.ctime(self.nTime), self.nBits, self.nNonce)
+               time.ctime(self.nTime), self.nBits, self.nNonce, "yes" if self.auxpow else "no")
 
 BLOCK_HEADER_SIZE = len(CBlockHeader().serialize())
 assert_equal(BLOCK_HEADER_SIZE, 80)
