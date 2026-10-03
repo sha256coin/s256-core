@@ -10,6 +10,19 @@ S256 is a Bitcoin fork that takes the contrarian approach: **"Double the Work, D
 
 Based on Bitcoin Core v31.1, S256 doubles key parameters for increased scarcity and deliberation:
 
+## What's New in v3.0.0
+
+**Mandatory upgrade before mainnet block 17,500**, where merged mining starts. Release candidate: v3.0.0rc1.
+
+- **Merged-mining consensus fixes** — the auxpow must now prove the merge-mining tag is in the parent block's coinbase, and the hash in the tag uses the same byte order as Namecoin and Dogecoin. Nodes older than 3.0.0 will split off at the first merge-mined block. **Merge-mining proxies must be updated:** see [POOL_PROXY_NOTE.md](POOL_PROXY_NOTE.md).
+- **Crash fixes** — nodes holding merge-mined blocks could crash serving their headers to syncing peers, and could fail to restart.
+- **Protocol version 70100** — `headers` messages are limited by size as well as count, for large merge-mined headers.
+- **Pool nodes** — a node restarted after a long gap between blocks serves templates straight away (default `-maxtipage` is now 7 days), and `createauxblock` reuses its template and reserves room for the auxpow.
+- **`MAX_MONEY` raised to 84 million**, matching S256's total supply.
+- **Testnet3 reset; no default signet** (`-signet` now requires `-signetchallenge`).
+
+Full details: [doc/release-notes.md](doc/release-notes.md).
+
 ## What's New in v2.2.0
 
 Rebased onto upstream **Bitcoin Core v31.1** (from v30.0), carrying forward roughly a year and a half of upstream fixes and improvements, plus:
@@ -185,6 +198,10 @@ S256 alongside its own block, at no extra cost to its miners' hashrate.
   pool has mined a qualifying block.
 - **Compatibility:** legacy (non-AuxPoW) blocks remain valid at every height, before and after
   activation — solo miners and existing pools are unaffected.
+
+**Pool and proxy operators:** v3.0.0 changes the byte order of the hash in the merge-mining tag and
+requires the coinbase merkle index to be 0. See [POOL_PROXY_NOTE.md](POOL_PROXY_NOTE.md) for the exact
+tag layout, examples, timing and how to check.
 
 See `src/auxpow.h`/`src/auxpow.cpp` for the AuxPoW proof format and validation, and `src/rpc/mining.cpp`
 for the RPC implementation.
