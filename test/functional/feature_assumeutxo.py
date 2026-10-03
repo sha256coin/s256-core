@@ -108,7 +108,8 @@ class AssumeutxoTest(BitcoinTestFramework):
             # magic, name, real
             [MAGIC_BYTES["mainnet"], "main", True],
             [MAGIC_BYTES["testnet4"], "testnet4", True],
-            [MAGIC_BYTES["signet"], "signet", True],
+            # S256 has no default signet, so the default signet magic is not a known network
+            [MAGIC_BYTES["signet"], "", False],
             [0x00000000.to_bytes(4, 'big'), "", False],
             [0xffffffff.to_bytes(4, 'big'), "", False],
         ]
