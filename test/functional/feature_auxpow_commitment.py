@@ -9,6 +9,7 @@
   be the slot expected for S256's chain ID, and the tag may appear only once
 - the tag carries the createauxblock hash bytes in hex order (Namecoin's)
 - an accepted aux block relays to a peer, a rejected one does not
+- getblock / getblockheader show the auxpow
 """
 
 from test_framework.auxpow import (
@@ -50,12 +51,42 @@ class AuxpowCommitmentTest(BitcoinTestFramework):
         assert_equal(self.nodes[0].submitauxblock(aux["hash"], auxpow), True)
         assert_equal(self.nodes[0].getbestblockhash(), aux["hash"])
         self.sync_blocks()
+        self.check_auxpow_json(aux["hash"], auxpow)
+
+    def check_auxpow_json(self, block_hash, auxpow_hex):
+        """The auxpow object of getblock and getblockheader on both nodes
+        matches the serialized auxpow."""
+        raw = bytes.fromhex(auxpow_hex)
+        parent = raw[-80:]
+        for node in self.nodes:
+            for result in (node.getblock(block_hash), node.getblock(block_hash, 2), node.getblockheader(block_hash)):
+                a = result["auxpow"]
+                assert raw.startswith(bytes.fromhex(a["tx"]["hex"]))
+                coinbase_len = len(bytes.fromhex(a["tx"]["hex"]))
+                rest = raw[coinbase_len:-80]
+                n = rest[0]
+                assert_equal(a["merklebranch"], [rest[1 + 32 * i:33 + 32 * i][::-1].hex() for i in range(n)])
+                rest = rest[1 + 32 * n + 4:]
+                m = rest[0]
+                assert_equal(a["chainmerklebranch"], [rest[1 + 32 * i:33 + 32 * i][::-1].hex() for i in range(m)])
+                assert_equal(a["chainindex"], int.from_bytes(rest[1 + 32 * m:5 + 32 * m], "little", signed=True))
+                p = a["parentblock"]
+                assert_equal(p["hash"], hash256(parent)[::-1].hex())
+                assert_equal(p["merkleroot"], parent[36:68][::-1].hex())
+                assert_equal(p["previousblockhash"], parent[4:36][::-1].hex())
+                assert_equal(p["version"], int.from_bytes(parent[:4], "little", signed=True))
+                assert_equal(p["versionHex"], parent[:4][::-1].hex())
+                assert_equal(p["time"], int.from_bytes(parent[68:72], "little"))
+                assert_equal(p["bits"], parent[72:76][::-1].hex())
+                assert_equal(p["nonce"], int.from_bytes(parent[76:80], "little"))
 
     def run_test(self):
         node = self.nodes[0]
         addr1 = node.get_deterministic_priv_key().address
         addr2 = self.nodes[1].get_deterministic_priv_key().address
         self.generatetoaddress(node, 20, addr1)
+        tip = node.getbestblockhash()
+        assert "auxpow" not in node.getblock(tip) and "auxpow" not in node.getblockheader(tip)
 
         self.log.info("Tag byte order: the createauxblock hash hex, decoded as is")
         aux = node.createauxblock(addr1)

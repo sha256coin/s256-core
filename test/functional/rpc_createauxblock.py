@@ -46,8 +46,11 @@ class CreateAuxBlockTest(BitcoinTestFramework):
         now = int(time.time())
         node.setmocktime(now)
 
-        self.log.info("Polling reuses the template per address")
+        self.log.info("_target is target in little-endian byte order")
         first = node.createauxblock(addr1)
+        assert_equal(first["_target"], bytes.fromhex(first["target"])[::-1].hex())
+
+        self.log.info("Polling reuses the template per address")
         assert_equal(node.createauxblock(addr1), first)
         other = node.createauxblock(addr2)
         assert other["hash"] != first["hash"]

@@ -1202,6 +1202,7 @@ static RPCHelpMan createauxblock()
                 {RPCResult::Type::NUM, "coinbasevalue", "value of the block reward, in satoshis"},
                 {RPCResult::Type::STR_HEX, "bits", "compact target of the next S256 block"},
                 {RPCResult::Type::STR_HEX, "target", "expanded target of the next S256 block"},
+                {RPCResult::Type::STR_HEX, "_target", "the same target in little-endian byte order, as Namecoin's createauxblock returns it"},
                 {RPCResult::Type::NUM, "height", "height of the next S256 block"},
             },
         },
@@ -1291,6 +1292,7 @@ static RPCHelpMan createauxblock()
     result.pushKV("coinbasevalue", (int64_t)block->vtx[0]->vout[0].nValue);
     result.pushKV("bits", strprintf("%08x", block->nBits));
     result.pushKV("target", target.GetHex());
+    result.pushKV("_target", HexStr(ArithToUint256(target)));
     result.pushKV("height", (int64_t)height);
     return result;
 },

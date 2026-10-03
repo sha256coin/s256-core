@@ -6,6 +6,7 @@
 #include <rpc/blockchain.h>
 
 #include <blockfilter.h>
+#include <auxpow.h>
 #include <chain.h>
 #include <chainparams.h>
 #include <chainparamsbase.h>
@@ -181,6 +182,59 @@ UniValue blockheaderToJSON(const CBlockIndex& tip, const CBlockIndex& blockindex
     return result;
 }
 
+//! S256: the "auxpow" object of a merge-mined block, as in Namecoin.
+static RPCResult AuxpowResult()
+{
+    return {RPCResult::Type::OBJ, "auxpow", /*optional=*/true, "The merge-mining proof, for merge-mined blocks",
+    {
+        {RPCResult::Type::OBJ, "tx", "The parent block's coinbase transaction",
+            {{RPCResult::Type::ELISION, "", "Same format as getrawtransaction with verbosity 1, including \"hex\""}}},
+        {RPCResult::Type::ARR, "merklebranch", "Merkle branch from the coinbase to the parent block's merkle root",
+            {{RPCResult::Type::STR_HEX, "", "Merkle branch hash"}}},
+        {RPCResult::Type::NUM, "chainindex", "This block's slot in the merge-mining merkle tree"},
+        {RPCResult::Type::ARR, "chainmerklebranch", "Merkle branch from this block's hash to the root in the merge-mining tag",
+            {{RPCResult::Type::STR_HEX, "", "Merkle branch hash"}}},
+        {RPCResult::Type::OBJ, "parentblock", "The parent block header",
+        {
+            {RPCResult::Type::STR_HEX, "hash", "The parent block hash"},
+            {RPCResult::Type::NUM, "version", "The parent block version"},
+            {RPCResult::Type::STR_HEX, "versionHex", "The parent block version formatted in hexadecimal"},
+            {RPCResult::Type::STR_HEX, "previousblockhash", "The parent block's previous block hash"},
+            {RPCResult::Type::STR_HEX, "merkleroot", "The parent block's merkle root"},
+            {RPCResult::Type::NUM_TIME, "time", "The parent block time expressed in " + UNIX_EPOCH_TIME},
+            {RPCResult::Type::STR_HEX, "bits", "The parent block's nBits"},
+            {RPCResult::Type::NUM, "nonce", "The parent block nonce"},
+        }},
+    }};
+}
+
+static UniValue AuxpowToJSON(const CAuxPow& auxpow)
+{
+    UniValue result(UniValue::VOBJ);
+    UniValue tx(UniValue::VOBJ);
+    TxToUniv(*auxpow.coinbaseTx, /*block_hash=*/uint256(), tx, /*include_hex=*/true);
+    result.pushKV("tx", std::move(tx));
+    UniValue branch(UniValue::VARR);
+    for (const uint256& node : auxpow.vMerkleBranch) branch.push_back(node.GetHex());
+    result.pushKV("merklebranch", std::move(branch));
+    result.pushKV("chainindex", auxpow.nChainIndex);
+    UniValue chain_branch(UniValue::VARR);
+    for (const uint256& node : auxpow.vChainMerkleBranch) chain_branch.push_back(node.GetHex());
+    result.pushKV("chainmerklebranch", std::move(chain_branch));
+    const CPureBlockHeader& parent{auxpow.parentBlock};
+    UniValue parent_obj(UniValue::VOBJ);
+    parent_obj.pushKV("hash", parent.GetHash().GetHex());
+    parent_obj.pushKV("version", parent.nVersion);
+    parent_obj.pushKV("versionHex", strprintf("%08x", parent.nVersion));
+    parent_obj.pushKV("previousblockhash", parent.hashPrevBlock.GetHex());
+    parent_obj.pushKV("merkleroot", parent.hashMerkleRoot.GetHex());
+    parent_obj.pushKV("time", parent.nTime);
+    parent_obj.pushKV("bits", strprintf("%08x", parent.nBits));
+    parent_obj.pushKV("nonce", parent.nNonce);
+    result.pushKV("parentblock", std::move(parent_obj));
+    return result;
+}
+
 /** Serialize coinbase transaction metadata */
 UniValue coinbaseTxToJSON(const CTransaction& coinbase_tx)
 {
@@ -202,6 +256,7 @@ UniValue coinbaseTxToJSON(const CTransaction& coinbase_tx)
 UniValue blockToJSON(BlockManager& blockman, const CBlock& block, const CBlockIndex& tip, const CBlockIndex& blockindex, TxVerbosity verbosity, const uint256 pow_limit)
 {
     UniValue result = blockheaderToJSON(tip, blockindex, pow_limit);
+    if (block.auxpow) result.pushKV("auxpow", AuxpowToJSON(*block.auxpow));
 
     result.pushKV("strippedsize", ::GetSerializeSize(TX_NO_WITNESS(block)));
     result.pushKV("size", ::GetSerializeSize(TX_WITH_WITNESS(block)));
@@ -626,6 +681,7 @@ static RPCHelpMan getblockheader()
                             {RPCResult::Type::NUM, "nTx", "The number of transactions in the block"},
                             {RPCResult::Type::STR_HEX, "previousblockhash", /*optional=*/true, "The hash of the previous block (if available)"},
                             {RPCResult::Type::STR_HEX, "nextblockhash", /*optional=*/true, "The hash of the next block (if available)"},
+                            AuxpowResult(),
                         }},
                     RPCResult{"for verbose=false",
                         RPCResult::Type::STR_HEX, "", "A string that is serialized, hex-encoded data for block 'hash'"},
@@ -669,7 +725,15 @@ static RPCHelpMan getblockheader()
         return strHex;
     }
 
-    return blockheaderToJSON(*tip, *pblockindex, chainman.GetConsensus().powLimit);
+    UniValue result = blockheaderToJSON(*tip, *pblockindex, chainman.GetConsensus().powLimit);
+    // S256: the auxpow is not in the block index; it is omitted if the block
+    // data is not on disk (pruned or not downloaded yet).
+    if (pblockindex->nVersion & VERSION_AUXPOW_BIT) {
+        if (const auto header{chainman.m_blockman.ReadBlockHeader(*pblockindex)}; header && header->auxpow) {
+            result.pushKV("auxpow", AuxpowToJSON(*header->auxpow));
+        }
+    }
+    return result;
 },
     };
 }
@@ -812,6 +876,7 @@ static RPCHelpMan getblock()
                     {RPCResult::Type::NUM, "nTx", "The number of transactions in the block"},
                     {RPCResult::Type::STR_HEX, "previousblockhash", /*optional=*/true, "The hash of the previous block (if available)"},
                     {RPCResult::Type::STR_HEX, "nextblockhash", /*optional=*/true, "The hash of the next block (if available)"},
+                    AuxpowResult(),
                 }},
                     RPCResult{"for verbosity = 2",
                 RPCResult::Type::OBJ, "", "",
