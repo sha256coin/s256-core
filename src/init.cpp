@@ -929,10 +929,6 @@ bool AppInitParameterInteraction(const ArgsManager& args)
         InitWarning(_("Option '-checkpoints' is set but checkpoints were removed. This option has no effect."));
     }
 
-    // We no longer limit the orphanage based on number of transactions but keep the option to warn users who still have it in their config.
-    if (args.IsArgSet("-maxorphantx")) {
-        InitWarning(_("Option '-maxorphantx' is set but no longer has any effect (see release notes). Please remove it from your configuration."));
-    }
     if (args.IsArgSet("-limitancestorsize")) {
         InitWarning(_("Option '-limitancestorsize' is given but ancestor size limits have been replaced with cluster size limits (see -limitclustersize). This option has no effect."));
     }
