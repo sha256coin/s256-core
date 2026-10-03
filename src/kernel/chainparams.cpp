@@ -580,10 +580,11 @@ public:
         nDefaultPort = 38333;
         nPruneAfterHeight = 1000;
 
-        genesis = CreateGenesisBlock(1598918400, 52613770, 0x1e0377ae, 1, 50 * COIN);
+        // S256: Bitcoin's signet time and bits, nonce mined for S256's genesis coinbase.
+        genesis = CreateGenesisBlock(1598918400, 9542011, 0x1e0377ae, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
-        //         assert(consensus.hashGenesisBlock == uint256{"00000008819873e925422c1ff0f99f7cc9bbb232af63a077a480a3633bee1ef6"});
-        //         assert(genesis.hashMerkleRoot == uint256{"4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"});
+        assert(consensus.hashGenesisBlock == uint256{"000000afa31d59375b5129d7d3a11e9becbe7abfb677ff0d50053dbfce533e42"});
+        assert(genesis.hashMerkleRoot == uint256{"10eea688c8ea4279596b96394d3c234064c566f61aeeb41976fa379bc4500e65"});
 
         m_assumeutxo_data = {
             {
