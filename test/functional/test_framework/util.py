@@ -611,8 +611,10 @@ def get_temp_default_datadir(temp_dir: pathlib.Path) -> tuple[dict, pathlib.Path
     GetDefaultDataDir() function return a datadir path under the provided
     temp_dir, as well as the complete path it would return."""
     if platform.system() == "Windows":
-        env = dict(APPDATA=str(temp_dir))
-        datadir = temp_dir / "SHA256Coin"  # S256: GetDefaultDataDir(), src/common/args.cpp
+        # S256: GetDefaultDataDir() uses CSIDL_LOCAL_APPDATA (Bitcoin: CSIDL_APPDATA),
+        # src/common/args.cpp.
+        env = dict(LOCALAPPDATA=str(temp_dir))
+        datadir = temp_dir / "SHA256Coin"
     else:
         env = dict(HOME=str(temp_dir))
         if platform.system() == "Darwin":
