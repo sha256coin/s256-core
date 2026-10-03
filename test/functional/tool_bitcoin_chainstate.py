@@ -13,14 +13,18 @@ snapshot and extend the snapshot chain with new blocks.
 
 import subprocess
 
-from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_framework import (
+    CACHE_HEIGHT,
+    BitcoinTestFramework,
+)
 from test_framework.util import assert_equal
 from test_framework.wallet import MiniWallet
 
-START_HEIGHT = 199
+# S256: the shared test cache is CACHE_HEIGHT = 299 blocks (Bitcoin: 199).
+START_HEIGHT = CACHE_HEIGHT
 # Hardcoded in regtest chainparams
-SNAPSHOT_BASE_BLOCK_HEIGHT = 299
-SNAPSHOT_BASE_BLOCK_HASH = "7cc695046fec709f8c9394b6f928f81e81fd3ac20977bb68760fa1faa7916ea2"
+SNAPSHOT_BASE_BLOCK_HEIGHT = START_HEIGHT + 100
+SNAPSHOT_BASE_BLOCK_HASH = "3ecff95c7ba3f293672c46d8a715de346bb5f71f34ec2520f2d8b37dbcaed881"
 
 
 class BitcoinChainstateTest(BitcoinTestFramework):
@@ -28,7 +32,7 @@ class BitcoinChainstateTest(BitcoinTestFramework):
         self.skip_if_no_bitcoin_chainstate()
 
     def set_test_params(self):
-        """Use the pregenerated, deterministic chain up to height 199."""
+        """Use the pregenerated, deterministic chain up to height CACHE_HEIGHT."""
         self.num_nodes = 2
 
     def setup_network(self):

@@ -136,20 +136,21 @@ BOOST_AUTO_TEST_CASE(test_assumeutxo)
 
     // These heights don't have assumeutxo configurations associated, per the contents
     // of kernel/chainparams.cpp.
-    std::vector<int> bad_heights{0, 100, 111, 115, 209, 211};
+    // S256: the unit-test entry is at 210 (Bitcoin 110), so 110 has none.
+    std::vector<int> bad_heights{0, 100, 110, 111, 115, 209, 211};
 
     for (auto empty : bad_heights) {
         const auto out = params->AssumeutxoForHeight(empty);
         BOOST_CHECK(!out);
     }
 
-    const auto out110 = *params->AssumeutxoForHeight(110);
-    BOOST_CHECK_EQUAL(out110.hash_serialized.ToString(), "b952555c8ab81fec46f3d4253b7af256d766ceb39fb7752b9d18cdf4a0141327");
-    BOOST_CHECK_EQUAL(out110.m_chain_tx_count, 111U);
+    const auto out210 = *params->AssumeutxoForHeight(210);
+    BOOST_CHECK_EQUAL(out210.hash_serialized.ToString(), "4bdb58cddd55d56b884d63407076e8b7bbe599effbfb2b15922b642f0eb6b943");
+    BOOST_CHECK_EQUAL(out210.m_chain_tx_count, 211U);
 
-    const auto out110_2 = *params->AssumeutxoForBlockhash(uint256{"6affe030b7965ab538f820a56ef56c8149b7dc1d1c144af57113be080db7c397"});
-    BOOST_CHECK_EQUAL(out110_2.hash_serialized.ToString(), "b952555c8ab81fec46f3d4253b7af256d766ceb39fb7752b9d18cdf4a0141327");
-    BOOST_CHECK_EQUAL(out110_2.m_chain_tx_count, 111U);
+    const auto out210_2 = *params->AssumeutxoForBlockhash(uint256{"004a45e1428f99e275f44ebcccb117823e3c493698d26692308f684bbdfc9a6b"});
+    BOOST_CHECK_EQUAL(out210_2.hash_serialized.ToString(), "4bdb58cddd55d56b884d63407076e8b7bbe599effbfb2b15922b642f0eb6b943");
+    BOOST_CHECK_EQUAL(out210_2.m_chain_tx_count, 211U);
 }
 
 BOOST_AUTO_TEST_CASE(block_malleation)
