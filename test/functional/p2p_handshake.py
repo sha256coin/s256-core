@@ -25,7 +25,10 @@ from test_framework.util import p2p_port
 # Desirable service flags for outbound non-pruned and pruned peers. Note that
 # the desirable service flags for pruned peers are dynamic and only apply if
 #  1. the peer's service flag NODE_NETWORK_LIMITED is set *and*
-#  2. the local chain is close to the tip (<24h)
+#  2. the local chain is close to the tip: less than NODE_NETWORK_LIMITED_ALLOW_CONN_BLOCKS
+#     (144) blocks of tip age. S256: at 20-minute blocks that is 48h (Bitcoin: 24h);
+#     src/net_processing.cpp, nPowTargetSpacing in src/kernel/chainparams.cpp.
+LIMITED_PEER_WINDOW = 144 * 20 * 60
 DESIRABLE_SERVICE_FLAGS_FULL = NODE_NETWORK | NODE_WITNESS
 DESIRABLE_SERVICE_FLAGS_PRUNED = NODE_NETWORK_LIMITED | NODE_WITNESS
 
@@ -86,11 +89,11 @@ class P2PHandshakeTest(BitcoinTestFramework):
         self.test_desirable_service_flags(node, [NODE_NETWORK | NODE_WITNESS],
                                           DESIRABLE_SERVICE_FLAGS_FULL, expect_disconnect=False)
 
-        self.log.info("Check that limited peers are only desired if the local chain is close to the tip (<24h)")
-        self.generate_at_mocktime(int(time.time()) - 25 * 3600)  # tip outside the 24h window, should fail
+        self.log.info("Check that limited peers are only desired if the local chain is close to the tip (<48h)")
+        self.generate_at_mocktime(int(time.time()) - LIMITED_PEER_WINDOW - 3600)  # tip outside the window, should fail
         self.test_desirable_service_flags(node, [NODE_NETWORK_LIMITED | NODE_WITNESS],
                                           DESIRABLE_SERVICE_FLAGS_FULL, expect_disconnect=True)
-        self.generate_at_mocktime(int(time.time()) - 23 * 3600)  # tip inside the 24h window, should succeed
+        self.generate_at_mocktime(int(time.time()) - LIMITED_PEER_WINDOW + 3600)  # tip inside the window, should succeed
         self.test_desirable_service_flags(node, [NODE_NETWORK_LIMITED | NODE_WITNESS],
                                           DESIRABLE_SERVICE_FLAGS_PRUNED, expect_disconnect=False)
 
