@@ -34,28 +34,11 @@ permissions:
 
 env:
   # Suites/cases excluded from the release test gate -- see
-  # s256-known-test-debt (project memory) for why each one is here.
+  # test/S256_TEST_PORTING.md for why each one is here.
   # Update this list as debt is fixed or new debt is found; it should
   # shrink over time, not grow.
   TEST_EXCLUDES: >-
     --run_test=!miner_tests/CreateNewBlock_validity
-    --run_test=!net_peer_connection_tests
-    --run_test=!net_tests/initial_advertise_from_version_message
-    --run_test=!net_tests/advertise_local_address
-    --run_test=!txpackage_tests
-    --run_test=!txvalidationcache_tests/checkinputs_test
-    --run_test=!validation_chainstate_tests/chainstate_update_tip
-    --run_test=!validation_chainstatemanager_tests
-    --run_test=!validation_tests
-    --run_test=!spend_tests
-    --run_test=!script_standard_tests
-    --run_test=!util_tests
-    --run_test=!miniminer_tests
-    --run_test=!disconnected_transactions
-    --run_test=!bip328_tests
-    --run_test=!walletload_tests
-    --run_test=!interfaces_tests
-    --run_test=!wallet_tests
 
 jobs:
   build:
@@ -268,6 +251,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      # For body_path (the release notes); the binaries come from the artifacts.
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -277,4 +263,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
-          generate_release_notes: true
+          body_path: doc/release-notes.md
+          generate_release_notes: false
+          prerelease: ${{ contains(github.ref_name, '-rc') }}
