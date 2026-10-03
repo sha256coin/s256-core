@@ -7,6 +7,7 @@ from decimal import Decimal
 import random
 
 from test_framework.blocktools import (
+    COINBASE_MATURITY,
     WITNESS_COMMITMENT_HEADER,
     add_witness_commitment,
     create_block,
@@ -94,7 +95,9 @@ from test_framework.wallet_util import generate_keypair
 
 MAX_SIGOP_COST = 80000
 
-SEGWIT_HEIGHT = 120
+# S256: COINBASE_MATURITY is 200 (Bitcoin: 100); keep upstream's 20-block
+# margin after the first coinbase matures.
+SEGWIT_HEIGHT = COINBASE_MATURITY + 20
 
 class UTXO():
     """Used to keep track of anyone-can-spend outputs that we can use in the tests."""
@@ -306,12 +309,13 @@ class SegWitTest(BitcoinTestFramework):
         self.test_node.send_and_ping(msg_no_witness_block(block))  # make sure the block was processed
         txid = block.vtx[0].txid_int
 
-        self.generate(self.wallet, 99)  # let the block mature
+        self.generate(self.wallet, COINBASE_MATURITY - 1)  # let the block mature
 
         # Create a transaction that spends the coinbase
         tx = CTransaction()
         tx.vin.append(CTxIn(COutPoint(txid, 0), b""))
-        tx.vout.append(CTxOut(49 * 100000000, CScript([OP_TRUE, OP_DROP] * 15 + [OP_TRUE])))
+        # S256: the coinbase is worth 100 coins (Bitcoin: 50); keep the 1-coin fee
+        tx.vout.append(CTxOut(99 * 100000000, CScript([OP_TRUE, OP_DROP] * 15 + [OP_TRUE])))
 
         # Check that serializing it with or without witness is the same
         # This is a sanity check of our testing framework.
@@ -320,7 +324,7 @@ class SegWitTest(BitcoinTestFramework):
         self.test_node.send_and_ping(msg_tx(tx))  # make sure the block was processed
         assert tx.txid_hex in self.nodes[0].getrawmempool()
         # Save this transaction for later
-        self.utxo.append(UTXO(tx.txid_int, 0, 49 * 100000000))
+        self.utxo.append(UTXO(tx.txid_int, 0, 99 * 100000000))
         self.generate(self.nodes[0], 1)
 
     @subtest
@@ -1424,7 +1428,7 @@ class SegWitTest(BitcoinTestFramework):
         spend_tx.wit.vtxinwit[0].scriptWitness.stack = [witness_script]
 
         # Now test a premature spend.
-        self.generate(self.nodes[0], 98)
+        self.generate(self.nodes[0], COINBASE_MATURITY - 2)
         block2 = self.build_next_block()
         self.update_witness_block_with_transactions(block2, [spend_tx])
         test_witness_block(self.nodes[0], self.test_node, block2, accepted=False, reason='bad-txns-premature-spend-of-coinbase')
