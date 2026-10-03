@@ -203,7 +203,8 @@ class MiningTemplateVerificationTest(BitcoinTestFramework):
         block_2_hash = node.getblockhash(block_0_height + 2)
 
         bad_tx = copy.deepcopy(tx)
-        bad_tx["tx"].vout[0].nValue = 10000000000
+        # S256: more than any coinbase input (100 coins; Bitcoin: 50)
+        bad_tx["tx"].vout[0].nValue = 20000000000
         bad_tx_hex = bad_tx["tx"].serialize().hex()
         assert_equal(
             node.testmempoolaccept([bad_tx_hex])[0]["reject-reason"],
