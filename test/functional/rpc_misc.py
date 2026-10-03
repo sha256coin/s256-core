@@ -5,7 +5,10 @@
 """Test RPC misc output."""
 import xml.etree.ElementTree as ET
 
-from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_framework import (
+    CACHE_HEIGHT,
+    BitcoinTestFramework,
+)
 from test_framework.util import (
     assert_raises_rpc_error,
     assert_equal,
@@ -111,7 +114,7 @@ class RpcMiscTest(BitcoinTestFramework):
         self.wait_until(lambda: all(i["synced"] for i in node.getindexinfo().values()))
 
         # Returns a list of all running indices by default
-        values = {"synced": True, "best_block_height": 200}
+        values = {"synced": True, "best_block_height": CACHE_HEIGHT + 1}
         assert_equal(
             node.getindexinfo(),
             {

@@ -23,7 +23,10 @@ from test_framework.p2p import (
     P2P_SERVICES,
     P2P_VERSION_RELAY,
 )
-from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_framework import (
+    CACHE_HEIGHT,
+    BitcoinTestFramework,
+)
 from test_framework.util import (
     assert_equal,
     assert_greater_than_or_equal,
@@ -167,7 +170,7 @@ class P2PLeakTest(BitcoinTestFramework):
         assert_greater_than_or_equal(time.time() + 3600, ver.nTime)
         assert_equal(ver.addrFrom.port, 0)
         assert_equal(ver.addrFrom.ip, '0.0.0.0')
-        assert_equal(ver.nStartingHeight, 201)
+        assert_equal(ver.nStartingHeight, CACHE_HEIGHT + 2)
         assert_equal(ver.relay, 1)
 
         self.log.info('Check that old peers are disconnected')

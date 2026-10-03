@@ -13,6 +13,7 @@ from test_framework.descriptors import descsum_create
 from test_framework.key import ECPubKey
 from test_framework.messages import COIN
 from test_framework.script_util import keys_to_multisig_script
+from test_framework.blocktools import COINBASE_MATURITY
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_raises_rpc_error,
@@ -42,7 +43,7 @@ class RpcCreateMultiSigTest(BitcoinTestFramework):
         self.wallet = MiniWallet(test_node=node0)
 
         self.log.info('Generating blocks ...')
-        self.generate(self.wallet, 149)
+        self.generate(self.wallet, COINBASE_MATURITY + 49)  # 49 mature coinbases
 
         self.create_keys(21)  # max number of allowed keys + 1
         m_of_n = [(2, 3), (3, 3), (2, 5), (3, 5), (10, 15), (15, 15)]
@@ -103,7 +104,7 @@ class RpcCreateMultiSigTest(BitcoinTestFramework):
         mredeem = msig["redeemScript"]
         assert_equal(desc, msig['descriptor'])
         if output_type == 'bech32':
-            assert madd[0:4] == "bcrt"  # actually a bech32 address
+            assert madd.startswith("s2rt1")  # actually a bech32 address (S256 regtest HRP s2rt, src/kernel/chainparams.cpp)
 
         spk = address_to_scriptpubkey(madd)
         value = decimal.Decimal("0.00004000")
