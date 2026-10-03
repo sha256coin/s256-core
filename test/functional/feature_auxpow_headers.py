@@ -30,6 +30,7 @@ from test_framework.util import (
     assert_equal,
     assert_greater_than,
     assert_raises_rpc_error,
+    p2p_port,
 )
 
 MINER, FRESH, PRESYNC, PRUNED, HEADERS_ONLY, FROM_PRUNED = range(6)
@@ -152,8 +153,11 @@ class AuxpowHeadersTest(BitcoinTestFramework):
         assert_equal(status, 404)
         # A fresh peer that can only ask the pruned node gets the headers below
         # the first pruned merge-mined block, and the pruned node keeps running.
+        # The peer then asks for pruned blocks and is disconnected, possibly
+        # before connect_nodes() would see the connection settle, so connect
+        # with a plain one-shot addnode.
         from_pruned = self.nodes[FROM_PRUNED]
-        self.connect_nodes(FROM_PRUNED, PRUNED)
+        from_pruned.addnode(f"127.0.0.1:{p2p_port(PRUNED)}", "onetry")
         self.wait_until(lambda: from_pruned.getblockchaininfo()["headers"] == first_aux_height - 1)
         assert_equal(pruned.getblockcount(), miner.getblockcount())
 
