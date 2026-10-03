@@ -14,7 +14,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
 
 
-DEFAULT_MAX_TIP_AGE = 24 * 60 * 60
+DEFAULT_MAX_TIP_AGE = 7 * 24 * 60 * 60  # S256: 7 days (Bitcoin: 24 h), src/kernel/chainstatemanager_opts.h
 
 
 class MaxTipAgeTest(BitcoinTestFramework):

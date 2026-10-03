@@ -46,8 +46,9 @@ class MinimumChainWorkTest(BitcoinTestFramework):
         for i in range(self.num_nodes-1):
             self.connect_nodes(i+1, i)
 
-        # Set clock of node2 2 days ahead, to keep it in IBD during this test.
-        self.nodes[2].setmocktime(int(time.time()) + 48*60*60)
+        # Set clock of node2 8 days ahead, to keep it in IBD during this test
+        # (S256: the default max tip age is 7 days, Bitcoin 24 h).
+        self.nodes[2].setmocktime(int(time.time()) + 8*24*60*60)
 
     def run_test(self):
         # Start building a chain on node0.  node2 shouldn't be able to sync until node1's
