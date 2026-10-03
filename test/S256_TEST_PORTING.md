@@ -27,7 +27,18 @@ Baseline before porting (full run with the exclude list): 14,256 failures.
 After step 1 (subsidy tests + `MAX_MONEY`): **39 failures**, all in the 9 suites below.
 After step 3: those 9 suites pass.
 
-Still excluded from the full run (crash/cascade, root causes outside these steps): `miner_tests/CreateNewBlock_validity`, `net_peer_connection_tests`, `net_tests/initial_advertise_from_version_message`, `net_tests/advertise_local_address`, `txpackage_tests`, `txvalidationcache_tests/checkinputs_test`, `validation_chainstate_tests/chainstate_update_tip`, `validation_chainstatemanager_tests`.
+rc1 (2026-10-03): the former exclude list is ported or fixed; only
+`miner_tests/CreateNewBlock_validity` is still excluded (see below).
+
+| Suite / case | Status | Notes |
+|---|---|---|
+| `net_tests/initial_advertise_from_version_message`, `advertise_local_address` | Passing | Fixed by removing the genesis IBD shortcut (node change, reported and approved) |
+| `net_peer_connection_tests` | Ported | |
+| `txpackage_tests` | Ported | Amounts relative to `COINBASE_VALUE` (100 COIN) instead of 50-coin literals |
+| `txvalidationcache_tests/checkinputs_test` | Ported | `-testactivationheight=dersig@202` (fixture chain is 200 blocks) |
+| `validation_chainstate_tests/chainstate_update_tip` | Passing | Needs the S256 regtest assumeutxo entry at 210 |
+| `validation_chainstatemanager_tests` | Ported | Heights +100 (snapshot at 210, snapshot chain 310/320), coin count `COINBASE_MATURITY` |
+| `miner_tests/CreateNewBlock_validity` | **Excluded for rc1** | Hard-coded Bitcoin nonces fail (`high-hash`) and 110 blocks are too few at maturity 200 (inputs from blocks 1-4 are spent at 111). Needs 210 blocks with new nonces (mainnet difficulty 1, ~4-6 min each); being regenerated after rc1, then committed with the table in one commit. No node change. |
 
 | Suite / case | Status | Notes |
 |---|---|---|
@@ -86,7 +97,9 @@ Still on Bitcoin's 21M, to port later:
 
 Not ported (not in the core set): signet magic, `compressor.py` self-test.
 
-### Core set (step 2), 36 runs: 16 pass, 20 fail
+### Core set (step 2), 36 runs: all pass (2026-10-03)
+
+The 20 failures below were ported in step 4; the table records their causes.
 
 Every failure is a Bitcoin value hard-coded in the test itself; none points to
 a node bug.
@@ -98,7 +111,7 @@ a node bug.
 | `p2p_blocksonly.py`, `p2p_compactblocks.py`, `p2p_getdata.py`, `p2p_ping.py` | Passing | |
 | `rpc_help.py`, `rpc_net.py` (v1, v2), `rpc_signmessagewithprivkey.py`, `rpc_uptime.py` | Passing | |
 | `wallet_createwallet.py` (+ `--usecli`), `wallet_keypool.py`, `wallet_listtransactions.py` | Passing | |
-| `mining_basic.py` | **Blocked: node bug** | `-blockversion=1337` sets the AuxPoW bit (0x100) without an auxpow; the node segfaults serializing the template. See "Node bug found" below |
+| `mining_basic.py` | Ported (was blocked by the node bug below, now fixed) | `-blockversion=1337` sets the AuxPoW bit (0x100) without an auxpow; the node segfaults serializing the template. See "Node bug found" below |
 | `rpc_getchaintips.py`, `rpc_misc.py`, `p2p_leak.py` | Failing | Expect tip height 200/201 (now 300/301) |
 | `wallet_basic.py`, `wallet_balance.py`, `wallet_send.py`, `wallet_address_types.py` | Failing | Expect 50-coin coinbase balances |
 | `rpc_blockchain.py` (v1, v2) | Failing | UTXO set totals assume 50-coin subsidy |
@@ -124,15 +137,51 @@ the bit and no auxpow. Serializing one segfaults the node. Reproduced:
 Same path, not separately reproduced: header announcements
 (`src/net_processing.cpp:5876, 5883`), REST `/headers` (`src/rest.cpp:240, 251`).
 Also hit by `-blockversion` with bit 8 set (regtest-only option).
-Reported, not fixed (node code).
+Fixed on `fix/auxpow-header-crash` (`a9ecaab931`: `GetPureHeader()` + `ReadBlockHeader()`).
 
 ### Also known
 
-- `feature_assumeutxo.py`: regtest `m_assumeutxo_data` (heights 110/200/299 in
-  `src/kernel/chainparams.cpp`) look like Bitcoin's regtest snapshots (not yet
-  verified). If so their blocks cannot exist on S256's regtest chain and the
-  test needs S256 snapshot values in chainparams (node code): to be reported
-  when that test is ported, not changed here.
+### Regtest assumeutxo entries (approved 2026-10-03)
+
+Regtest `m_assumeutxo_data` held Bitcoin's snapshots, whose blocks cannot
+exist on S256's regtest chain. Replaced with values measured on S256's
+deterministic chains (`src/kernel/chainparams.cpp`):
+
+| Used by | Bitcoin | S256 |
+|---|---|---|
+| unit tests (200-block fixture + 10) | 110 | 210, chain_tx_count 211 |
+| `feature_assumeutxo.py`, `wallet_assumeutxo.py`, `tool_bitcoin_chainstate.py` (cache 299 + 100) | 299 | 399, chain_tx_count 434 |
+| fuzz target `utxo_snapshot` | 200 | **unchanged: regenerate with a fuzz build later** |
+
+`feature_assumeutxo.py` port, besides heights and hashes: the coin height that
+must be above the snapshot base moved from 364 to 464; the mempool spend of a
+coin known only from the snapshot uses the MiniWallet output in block 300
+(none of the 100 not-yet-downloaded coinbases is mature at 200); the cached
+chain overflows one 64 KiB `-fastprune` blockfile, so assumed blocks start in
+`blk00002`. `tool_bitcoin_chainstate.py` is skipped in this build (no
+`bitcoin-chainstate` binary).
+
+### rc1 ports (2026-10-03)
+
+- IBD tests assuming Bitcoin's 24 h max tip age (S256: 7 days):
+  `feature_maxtipage.py`, `feature_minchainwork.py`, `p2p_ibd_txrelay.py`.
+- `p2p_auxpow_headers.py`: the node connects blocks one at a time, so a busy
+  node may announce three large headers in more than one message; the test
+  now checks the size limit on every message and retries until the inv
+  fallback is exercised.
+- Merge leftovers from v31.1 removed: `tool_wallet.py` (createfromdump with an
+  unnamed wallet, which v31.1 rejects) and a duplicated block in `rpc_misc.py`.
+  `tool_wallet.py` still fails further on (101 blocks then a spend: maturity 100).
+- Signet: the genesis nonce was Bitcoin's and did not meet the target with
+  S256's coinbase, so no signet node could start. Nonce re-mined (node change,
+  approved), genesis asserts enabled. `tool_signet_miner.py` and
+  `wallet_crosschain.py` pass; `feature_signet.py` still submits Bitcoin's
+  pregenerated signet blocks (to regenerate).
+
+The remaining functional failures of the full suite (all Bitcoin values:
+maturity 100 and 200-block heights, 50-coin balances, `bcrt` and mainnet
+address literals and vectors, Bitcoin's genesis hash, the literal
+`bitcoin.conf`, the 144-block versionbits warning period) are ported after rc1.
 
 ## Skipped tests
 
