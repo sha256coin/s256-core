@@ -15,9 +15,11 @@
 
 #include <boost/test/unit_test.hpp>
 
+// S256: DERSIG activates just after the setup chain, which is
+// COINBASE_MATURITY = 200 blocks long here (Bitcoin: 100).
 struct Dersig100Setup : public TestChain100Setup {
     Dersig100Setup()
-        : TestChain100Setup{ChainType::REGTEST, {.extra_args = {"-testactivationheight=dersig@102"}}} {}
+        : TestChain100Setup{ChainType::REGTEST, {.extra_args = {"-testactivationheight=dersig@202"}}} {}
 };
 
 bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
