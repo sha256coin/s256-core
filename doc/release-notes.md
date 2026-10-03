@@ -1,140 +1,137 @@
-v31.1 Release Notes
-===================
+SHA256Coin Core 3.0.0rc1 Release Notes
+======================================
 
-Bitcoin Core version 31.1 is now available from:
+SHA256Coin Core 3.0.0 is a **mandatory upgrade**, and this is its first release candidate. Every mainnet node and every merge-mining setup must run 3.0.0 **before mainnet block 17,500**.
 
-  <https://bitcoincore.org/bin/bitcoin-core-31.1/>
+3.0.0 is based on Bitcoin Core 31.1, the same base as 2.2.0. These notes list what changed since SHA256Coin Core 2.2.0.
 
-This release includes new features, various bug fixes and performance
-improvements, as well as updated translations.
+Mandatory upgrade before block 17,500
+-------------------------------------
 
-Please report bugs using the issue tracker at GitHub:
+Merged mining (AuxPoW) starts at mainnet block 17,500, as before. 3.0.0 changes how merge-mined blocks are validated. Nodes older than 3.0.0 will reject merge-mined blocks made the new way, and 3.0.0 nodes will reject blocks made the old way. A node that is not upgraded will split off the network at the first merge-mined block.
 
-  <https://github.com/bitcoin/bitcoin/issues>
+What to do:
 
-To receive security and update notifications, please subscribe to:
+- **Node operators:** install 3.0.0 before block 17,500. No reindex is needed. Mainnet data directories, wallets and configuration files carry over unchanged.
+- **Pool and merge-mining operators:** update your merge-mining proxy as described in "Pool integration notes" below. Change the proxy at the same time as the node it talks to, never before.
+- **Testnet3 operators:** testnet3 is being restarted (see "Testnet3 reset").
 
-  <https://bitcoincore.org/en/list/announcements/join/>
+Consensus changes
+-----------------
 
-How to Upgrade
-==============
+These apply to merge-mined blocks only, so on mainnet they take effect from block 17,500. Blocks that are not merge-mined are unaffected and stay valid at every height.
 
-If you are running an older version, shut it down. Wait until it has completely
-shut down (which might take a few minutes in some cases), then run the installer
-(on Windows) or just copy over `/Applications/Bitcoin-Qt` (on macOS) or
-`bitcoind`/`bitcoin-qt` (on Linux).
+- **The auxpow must prove the merge-mining tag is in the parent block's coinbase.** Before, the tagged transaction could be any transaction in the parent block. That let one parent block's work be reused for SHA256Coin blocks it never intended to mine. The auxpow's coinbase merkle index must now be 0 (rejection reason `auxpow-coinbase-not-first`).
+- **Byte order of the block hash in the merge-mining tag** now matches Namecoin and Dogecoin. The hash returned by `createauxblock` goes into the tag as it decodes, with no byte reversal. Older SHA256Coin builds expected it reversed. See "Pool integration notes".
+- **`MAX_MONEY` raised from 21,000,000 to 84,000,000 coins.** SHA256Coin's issuance (100 coins per block, halving every 420,000 blocks) approaches 84 million, and total supply passes 21 million at block 210,000. Without this change, transactions and wallet balances above 21 million would become invalid from then on. It has no effect before that height, so no activation logic is needed.
 
-Upgrading directly from a version of Bitcoin Core that has reached its EOL is
-possible, but it might take some time if the data directory needs to be
-migrated. Old wallet versions of Bitcoin Core are generally supported.
+Pool integration notes
+----------------------
 
-Compatibility
-==============
+A merge-mining proxy must match two changes. Blocks built the old way will be rejected by 3.0.0 nodes.
 
-Bitcoin Core is supported and tested on the following operating systems or
-newer: Linux Kernel 3.17, macOS 14, and Windows 10 (version 1903). Bitcoin Core
-should also work on most other Unix-like systems but is not as frequently tested
-on them. It is not recommended to use Bitcoin Core on unsupported systems.
+**1. Byte order of the hash in the coinbase tag (the main change)**
 
-Notable changes
-===============
+Put the `hash` returned by `createauxblock` into the merge-mining tag **as the hex string decodes, with no byte reversal**. Namecoin and Dogecoin do it the same way.
 
-### PrivateBroadcast
+Tag layout in the parent coinbase scriptSig (single aux chain):
 
-This release fixes an ip address leak when using the -privatebroadcast feature.
-Under certain circumstances connections were being made over clearnet rather than
-the enabled privacy network.
+```
+fabe6d6d | unhex(hash) (32 bytes, as is) | 01000000 (tree size 1, LE) | nonce (4 bytes, LE)
+```
 
+Example for `hash = 000000000000003f2a9c1e5b7d4f60718293a4b5c6d7e8f90a1b2c3d4e5f6071`:
 
-### Validation
+```
+new (required): fabe6d6d000000000000003f2a9c1e5b7d4f60718293a4b5c6d7e8f90a1b2c3d4e5f60710100000000000000
+old (rejected): fabe6d6d71605f4e3d2c1b0af9e8d7c6b5a4938271604f7d5b1e9c2a3f000000000000000100000000000000
+```
 
-- #35209 validation: correct lifetime of precomputed tx data
-- #35465 coins: compact chainstate regularly
+Merging SHA256Coin with other chains in one tag now works as for Namecoin and Dogecoin:
 
-### Leveldb
+- Build the standard merged-mining tree and put its root in the tag the same way you do for those chains.
+- SHA256Coin's slot in the tree comes from the standard expected-index formula, using the tree's merkle nonce and SHA256Coin's chain ID: `1395799350` (`0x53323536`). `createauxblock` returns it as `chainid`.
+- If your proxy reverses the hash for SHA256Coin only, remove that special case. Treat SHA256Coin exactly like Namecoin.
 
-- #61(bitcoin-core/leveldb): Disable seek compaction
+**2. Coinbase merkle index must be 0**
 
-### P2P
+The auxpow sent to `submitauxblock` must prove the tag is in the parent block's coinbase, so its coinbase merkle branch index must be 0. A proxy that builds the branch for the coinbase already sends 0.
 
-- #35032 net_processing: don't modify addrman for private broadcast connections
-- #35410 net: use the proxy if overriden when doing v2->v1 reconnections
+**Unchanged:** how `createauxblock` and `submitauxblock` are used, the auxpow serialization, and the tree size and nonce fields.
 
-### Wallet
+**Timing:** switch the proxy at the same time as the node upgrade. Old nodes reject the new tag order and new nodes reject the old one. Do not switch the proxy until the node it talks to runs 3.0.0, because an old node rejects every block built the new way.
 
-- #35227 wallet: check the final BDB page LSN during migration
-- #35228 wallet: use outpoint when estimating input size
+- **Mainnet:** the first merge-mined block is at 17,500, so use the new order from the start.
+- **Testnet3:** switch when you restart on the reset chain.
 
-### Musig
+**How to check:** on testnet or regtest, `submitauxblock` should return `true`. If it returns `false` and the node's `debug.log` shows `auxpow-chain-merkle-mismatch`, the hash bytes in the tag are in the wrong order.
 
-- #35316 musig: Reject empty pubkey list in GetMuSig2KeyAggCache
+**Other changes relevant to pools:**
 
-### Build
+- `createauxblock` keeps one current template per payout script. It makes a new template only when the tip changes, or when the mempool has changed and 60 seconds have passed (as Namecoin does). Polling it no longer creates a new block each time. A template stays valid after a submission until the tip changes.
+- `createauxblock` reserves block weight for the auxpow attached at submission. The new option `-auxpowreservedweight=<n>` sets the amount on top of `-blockreservedweight`. The default is 40,000 weight units, room for about a 10 KB parent coinbase, for example a pool that pays out in the coinbase. Raise it if your parent coinbase is larger.
+- `createauxblock` returns `_target` (the target in little-endian byte order) next to `target`.
+- On mainnet, `createauxblock` now refuses to hand out templates while the node has no peers or is in initial block download, as `getblocktemplate` does. Test networks skip these checks.
 
-- #34228 depends: Unset SOURCE_DATE_EPOCH in gen_id script
+Initial block download and template RPCs
+----------------------------------------
 
-### Test
+- **The default `-maxtipage` is now 7 days (Bitcoin Core's is 24 hours).** Gaps of several hours between blocks happen on SHA256Coin. With a 24-hour limit, a pool node restarted after such a gap counted as being in initial block download, and `getblocktemplate` refused to work. A node restarted with a tip up to 7 days old now serves templates straight away.
+- **Removed a startup shortcut that took a node out of initial block download whenever its tip was the genesis block.** Fresh nodes now stay in initial block download until they have synced. The minimum chain work requirement keeps them there until they have the real chain.
+- To use Bitcoin Core's 24-hour limit instead, set `-maxtipage=86400`.
 
-- #34425 test: Fix all races after a socket is closed gracefully
-- #34863 test: Clean shutdown in Socks5Server
-- #34991 test: fix feature_index_prune.py bug when using --usecli
-- #35080 test: Add missing self.options.timeout_factor scale in tool_bitcoin_chainstate.py
-- #35218 test: fix P2SH script in coins cache fuzz target
-- #35279 psbt, test: remove address type restrictions in test
+P2P and protocol
+----------------
 
-### Fuzz
+- **Protocol version 70100.** Merge-mined headers carry the parent block's coinbase and merkle branches, so their size varies. From version 70100, `headers` messages are also limited by size. A reply stops at the header that reaches 2,000,000 bytes, and the receiving peer then asks for more. A header announcement that would exceed the limit falls back to an `inv`. Older peers are still served (oversized replies are cut for them too) and still connect.
+- **The minimum peer protocol version is unchanged in 3.0.0**, so 2.x nodes can still connect.
+- **Headers sync** keeps each header's auxpow through the low-work headers presync, and its memory parameters are retuned for merge-mined headers (about 1.6 MiB per syncing peer).
 
-- #35289 fuzz: Fix timeout in txorphan
+Fixes
+-----
 
-### Util
+- **Crashes with merge-mined blocks.** A node holding merge-mined blocks could crash when serving their headers: answering `getheaders` from a syncing peer, announcing headers, `getblockheader <hash> false`, or REST `/headers`. Merge-mined headers are now read from disk with their auxpow. Restarting a node holding such blocks also failed, because the proof of work was checked against the block's own hash instead of its auxpow. Both are fixed.
+- **No permanent "Unknown new rules activated (versionbit 8)" warning.** Bit 8 marks a merge-mined block and is no longer treated as an unknown soft fork signal.
+- **The auxpow check verifies the parent header's proof of work first,** so invalid auxpows are rejected cheaply.
+- **`createauxblock` no longer hands out a hash over a null merkle root.**
 
-- #35384 util: Check write failures before renaming settings.json
+RPC
+---
 
-### Docs
+- `getblock` (verbosity 1 and above), verbose `getblockheader` and the REST block JSON include an `auxpow` object for merge-mined blocks: the parent coinbase, the merkle branches, the chain index and the parent header. The format follows Namecoin's.
+- `getblockheader` and REST `/headers` return an error for a merge-mined block whose data is not on disk (pruned or not yet downloaded), because the auxpow is only stored with the block.
 
-- #35283 doc: mention -DWITH_ZMQ=ON in BSD build guides
+Networks
+--------
 
-### CI
+### Testnet3 reset
 
-- #35202 ci: restore sockets in i686, no IPC job
-- #35230 ci: Move --usecli --extended from i386 task to alpine task
-- #35348 ci: switch to GitHub cache for all runners
-- #35378 ci: switch runners from cirrus to warpbuild
-- #35408 ci: 35378 followups
-- #35430 ci: use warp caching on warp runners
-- #35447 ci: use warpbuild cache for docker buildkit cache
+Testnet3 now activates BIP34, BIP65, BIP66, CSV and SegWit from block 1, as testnet4 does. It previously used Bitcoin testnet3's activation heights, which SHA256Coin's testnet never reaches, and that blocked merge-mined testnet blocks. This is a consensus change for testnet3, so the testnet3 chain is being restarted.
 
-### Misc
+- Upgrade, then delete the `blocks/` and `chainstate/` directories under `testnet3/` in your data directory, and start the node. Wallets in `testnet3/wallets/` can be kept.
+- Pools: switch the merge-mining proxy to the new tag order when you restart on the reset chain.
 
-- #35044 contrib: Fix NameError in signet miner gbt()
-- #35175 multi_index: fix compilation failure with boost >= 1.91
-- #34953 crypto: disable ASan instrumentation of SSE4 SHA256 for GCC
+### Testnet4
+
+Testnet4 no longer carries Bitcoin testnet4's minimum chain work, assumevalid block or assumeutxo snapshots. Fresh testnet4 nodes previously could never leave initial block download.
+
+### Signet
+
+- There is **no default signet** any more. `-signet` without `-signetchallenge` now exits with:
+
+  ```
+  Error: -signet requires -signetchallenge: SHA256Coin has no default signet.
+  ```
+
+  The previous default was Bitcoin's signet: its challenge, seeds and chain data.
+- Custom signets (`-signet -signetchallenge=<script>`) work. Before, no signet node could start, because its genesis block was invalid. The signet genesis block is now valid and checked at startup, like every other network's.
+
+Notes for the next release
+--------------------------
+
+- **The next release after block 17,500 will raise the minimum peer protocol version to 70100.** Nodes older than 3.0.0 will then no longer be able to connect. 3.0.0 keeps accepting them so the network can upgrade before the fork.
 
 Credits
-=======
+-------
 
-Thanks to everyone who directly contributed to this release:
-
-- andrewtoth
-- Cory Fields
-- Crypt-iQ
-- darosior
-- deadmanoz
-- fanquake
-- Greg Sanders
-- Hennadii Stepanov
-- junbyjun1238
-- Lőrinc
-- MarcoFalke
-- marcofleon
-- nervana21
-- optout21
-- Pol Espinasa
-- rkrux
-- Shrey
-- Torkel Rogstad
-- Vasil Dimov
-- willcl-ark
-
-As well as to everyone that helped with translations on
-[Transifex](https://explore.transifex.com/bitcoin/bitcoin/).
+Thanks to everyone who contributed to this release, and to the Bitcoin Core developers for the code SHA256Coin Core is based on. Release notes for Bitcoin Core 31.1 are in `doc/release-notes/release-notes-31.1.md`.
