@@ -722,11 +722,12 @@ public:
         m_is_mockable_chain = true;
 
         m_assumeutxo_data = {
-            {   // For use by unit tests
-                .height = 110,
-                .hash_serialized = AssumeutxoHash{uint256{"b952555c8ab81fec46f3d4253b7af256d766ceb39fb7752b9d18cdf4a0141327"}},
-                .m_chain_tx_count = 111,
-                .blockhash = uint256{"6affe030b7965ab538f820a56ef56c8149b7dc1d1c144af57113be080db7c397"},
+            {   // For use by unit tests. S256: TestChain100Setup's chain is
+                // COINBASE_MATURITY = 200 blocks, plus the tests' 10 (Bitcoin: 110).
+                .height = 210,
+                .hash_serialized = AssumeutxoHash{uint256{"4bdb58cddd55d56b884d63407076e8b7bbe599effbfb2b15922b642f0eb6b943"}},
+                .m_chain_tx_count = 211,
+                .blockhash = uint256{"004a45e1428f99e275f44ebcccb117823e3c493698d26692308f684bbdfc9a6b"},
             },
             {
                 // For use by fuzz target src/test/fuzz/utxo_snapshot.cpp
@@ -737,10 +738,11 @@ public:
             },
             {
                 // For use by test/functional/feature_assumeutxo.py and test/functional/tool_bitcoin_chainstate.py
-                .height = 299,
-                .hash_serialized = AssumeutxoHash{uint256{"d2b051ff5e8eef46520350776f4100dd710a63447a8e01d917e92e79751a63e2"}},
-                .m_chain_tx_count = 334,
-                .blockhash = uint256{"7cc695046fec709f8c9394b6f928f81e81fd3ac20977bb68760fa1faa7916ea2"},
+                // S256: the functional test cache is 299 blocks, plus the tests' 100 (Bitcoin: 199 + 100).
+                .height = 399,
+                .hash_serialized = AssumeutxoHash{uint256{"2a5fd472704168b44dd2249ad931ac1af66dd44ef7aa610125b168fb3b420845"}},
+                .m_chain_tx_count = 434,
+                .blockhash = uint256{"3ecff95c7ba3f293672c46d8a715de346bb5f71f34ec2520f2d8b37dbcaed881"},
             },
         };
 

@@ -7,7 +7,10 @@ See feature_assumeutxo.py for background.
 """
 from test_framework.address import address_to_scriptpubkey
 from test_framework.descriptors import descsum_create
-from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_framework import (
+    CACHE_HEIGHT,
+    BitcoinTestFramework,
+)
 from test_framework.messages import COIN
 from test_framework.util import (
     assert_equal,
@@ -19,9 +22,10 @@ from test_framework.util import (
 from test_framework.wallet import MiniWallet
 from test_framework.wallet_util import get_generate_key
 
-START_HEIGHT = 199
-SNAPSHOT_BASE_HEIGHT = 299
-FINAL_HEIGHT = 399
+# S256: the shared test cache is CACHE_HEIGHT = 299 blocks (Bitcoin: 199).
+START_HEIGHT = CACHE_HEIGHT
+SNAPSHOT_BASE_HEIGHT = START_HEIGHT + 100
+FINAL_HEIGHT = SNAPSHOT_BASE_HEIGHT + 100
 
 
 class AssumeutxoTest(BitcoinTestFramework):
@@ -29,7 +33,7 @@ class AssumeutxoTest(BitcoinTestFramework):
         self.skip_if_no_wallet()
 
     def set_test_params(self):
-        """Use the pregenerated, deterministic chain up to height 199."""
+        """Use the pregenerated, deterministic chain up to height CACHE_HEIGHT."""
         self.num_nodes = 4
         self.rpc_timeout = 120
         self.extra_args = [
@@ -95,13 +99,14 @@ class AssumeutxoTest(BitcoinTestFramework):
         # After background sync, pruneheight is reset to 0, so mine 200 blocks
         # and prune the chain again
         self.generate(n3, nblocks=200, sync_fun=self.no_op)
-        assert_equal(n3.pruneblockchain(FINAL_HEIGHT), 298)  # 298 is the height of the last block pruned (pruneheight 299)
+        # the last block pruned is just below the snapshot base (pruneheight SNAPSHOT_BASE_HEIGHT)
+        assert_equal(n3.pruneblockchain(FINAL_HEIGHT), SNAPSHOT_BASE_HEIGHT - 1)
         error_message = "Wallet loading failed. Prune: last wallet synchronisation goes beyond pruned data. You need to -reindex (download the whole blockchain again in case of a pruned node)"
-        # This backup (backup_w2.dat) was created at height 199, so it can't be restored in a node with a pruneheight of 299
+        # This backup (backup_w2.dat) was created at height START_HEIGHT, so it can't be restored in a node with a pruneheight of SNAPSHOT_BASE_HEIGHT
         assert_raises_rpc_error(-4, error_message, n3.restorewallet, "w2_pruneheight", "backup_w2.dat")
 
         self.log.info("Ensuring wallet can be restored from a backup that was created at the pruneheight (pruned node)")
-        # This backup (backup_w.dat) was created at height 299, so it can be restored in a node with a pruneheight of 299
+        # This backup (backup_w.dat) was created at height SNAPSHOT_BASE_HEIGHT, so it can be restored in a node with a pruneheight of SNAPSHOT_BASE_HEIGHT
         n3.restorewallet("w_alt", "backup_w.dat")
         # Check balance of w_alt wallet
         w_alt = n3.get_wallet_rpc("w_alt")
@@ -172,8 +177,8 @@ class AssumeutxoTest(BitcoinTestFramework):
 
         assert_equal(
             dump_output['txoutset_hash'],
-            "d2b051ff5e8eef46520350776f4100dd710a63447a8e01d917e92e79751a63e2")
-        assert_equal(dump_output["nchaintx"], 334)
+            "2a5fd472704168b44dd2249ad931ac1af66dd44ef7aa610125b168fb3b420845")
+        assert_equal(dump_output["nchaintx"], 434)  # S256: m_chain_tx_count of the regtest assumeutxo entry at 399
         assert_equal(n0.getblockchaininfo()["blocks"], SNAPSHOT_BASE_HEIGHT)
 
         # Mine more blocks on top of the snapshot that n1 hasn't yet seen. This

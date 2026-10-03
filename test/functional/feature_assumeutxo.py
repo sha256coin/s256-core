@@ -32,7 +32,10 @@ from test_framework.messages import (
 from test_framework.p2p import (
     P2PInterface,
 )
-from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_framework import (
+    CACHE_HEIGHT,
+    BitcoinTestFramework,
+)
 from test_framework.util import (
     assert_approx,
     assert_equal,
@@ -43,10 +46,7 @@ from test_framework.util import (
     sha256sum_file,
     try_rpc,
 )
-from test_framework.wallet import (
-    getnewdestination,
-    MiniWallet,
-)
+from test_framework.wallet import MiniWallet
 from test_framework.blocktools import (
     REGTEST_N_BITS,
     REGTEST_TARGET,
@@ -54,16 +54,17 @@ from test_framework.blocktools import (
     target_str,
 )
 
-START_HEIGHT = 199
-SNAPSHOT_BASE_HEIGHT = 299
-FINAL_HEIGHT = 399
+# S256: the shared test cache is CACHE_HEIGHT = 299 blocks (Bitcoin: 199).
+START_HEIGHT = CACHE_HEIGHT
+SNAPSHOT_BASE_HEIGHT = START_HEIGHT + 100
+FINAL_HEIGHT = SNAPSHOT_BASE_HEIGHT + 100
 COMPLETE_IDX = {'synced': True, 'best_block_height': FINAL_HEIGHT}
 
 
 class AssumeutxoTest(BitcoinTestFramework):
 
     def set_test_params(self):
-        """Use the pregenerated, deterministic chain up to height 199."""
+        """Use the pregenerated, deterministic chain up to height CACHE_HEIGHT."""
         self.num_nodes = 4
         self.rpc_timeout = 120
         self.extra_args = [
@@ -126,7 +127,7 @@ class AssumeutxoTest(BitcoinTestFramework):
             with open(bad_snapshot_path, 'wb') as f:
                 f.write(valid_snapshot_contents[:11] + bytes.fromhex(bad_block_hash)[::-1] + valid_snapshot_contents[43:])
 
-            msg = f"Unable to load UTXO snapshot: assumeutxo block hash in snapshot metadata not recognized (hash: {bad_block_hash}). The following snapshot heights are available: 110, 200, 299."
+            msg = f"Unable to load UTXO snapshot: assumeutxo block hash in snapshot metadata not recognized (hash: {bad_block_hash}). The following snapshot heights are available: 210, 200, 399."
             assert_raises_rpc_error(-32603, msg, node.loadtxoutset, bad_snapshot_path)
 
         self.log.info("  - snapshot file with wrong number of coins")
@@ -136,18 +137,18 @@ class AssumeutxoTest(BitcoinTestFramework):
                 f.write(valid_snapshot_contents[:43])
                 f.write((valid_num_coins + off).to_bytes(8, "little"))
                 f.write(valid_snapshot_contents[43 + 8:])
-            expected_error(msg="Bad snapshot - coins left over after deserializing 298 coins." if off == -1 else "Bad snapshot format or truncated snapshot after deserializing 299 coins.")
+            expected_error(msg=f"Bad snapshot - coins left over after deserializing {SNAPSHOT_BASE_HEIGHT - 1} coins." if off == -1 else f"Bad snapshot format or truncated snapshot after deserializing {SNAPSHOT_BASE_HEIGHT} coins.")
 
         self.log.info("  - snapshot file with alternated but parsable UTXO data results in different hash")
         cases = [
             # (content, offset, wrong_hash, custom_message)
-            [b"\xff" * 32, 0, "77874d48d932a5cb7a7f770696f5224ff05746fdcf732a58270b45da0f665934", None],  # wrong outpoint hash
+            [b"\xff" * 32, 0, "9f04360d1b25079132ba84968217c2e1bc5b0d602e7640dc24049e555b987d49", None],  # wrong outpoint hash
             [(2).to_bytes(1, "little"), 32, None, "Bad snapshot format or truncated snapshot after deserializing 1 coins."],  # wrong txid coins count
             [b"\xfd\xff\xff", 32, None, "Mismatch in coins count in snapshot metadata and actual snapshot data"],  # txid coins count exceeds coins left
-            [b"\x01", 33, "9f562925721e4f97e6fde5b590dbfede51e2204a68639525062ad064545dd0ea", None],  # wrong outpoint index
-            [b"\x82", 34, "161393f07f8ad71760b3910a914f677f2cb166e5bcf5354e50d46b78c0422d15", None],  # wrong coin code VARINT
-            [b"\x80", 34, "e6fae191ef851554467b68acff01ca09ad0a2e48c9b3dfea46cf7d35a7fd0ad0", None],  # another wrong coin code
-            [b"\x84\x58", 34, None, "Bad snapshot data after deserializing 0 coins"],  # wrong coin case with height 364 and coinbase 0
+            [b"\x01", 33, "d03f6e3962afea65ac9156be3bc1d2601d303d064e90c112f2812955888df3fe", None],  # wrong outpoint index
+            [b"\x82", 34, "2593a565466eb74ad23229aa9f29d19439c3ea5d0934b526f8fbae68efc69ca4", None],  # wrong coin code VARINT
+            [b"\x80", 34, "0d56319c0823896ec0c5860a44d9e769e1253e76e027454b838ea686a0f7412a", None],  # another wrong coin code
+            [b"\x86\x20", 34, None, "Bad snapshot data after deserializing 0 coins"],  # wrong coin case with height 464 (above the base height; Bitcoin 364) and coinbase 0
             [
                 # compressed txout value + scriptpubkey
                 ser_varint(compress_amount(MAX_MONEY + 1)) + ser_varint(0),
@@ -165,12 +166,12 @@ class AssumeutxoTest(BitcoinTestFramework):
                 f.write(content)
                 f.write(valid_snapshot_contents[(5 + 2 + 4 + 32 + 8 + offset + len(content)):])
 
-            msg = custom_message if custom_message is not None else f"Bad snapshot content hash: expected d2b051ff5e8eef46520350776f4100dd710a63447a8e01d917e92e79751a63e2, got {wrong_hash}."
+            msg = custom_message if custom_message is not None else f"Bad snapshot content hash: expected 2a5fd472704168b44dd2249ad931ac1af66dd44ef7aa610125b168fb3b420845, got {wrong_hash}."
             expected_error(msg)
 
     def test_headers_not_synced(self, valid_snapshot_path):
         for node in self.nodes[1:]:
-            msg = "Unable to load UTXO snapshot: The base block header (7cc695046fec709f8c9394b6f928f81e81fd3ac20977bb68760fa1faa7916ea2) must appear in the headers chain. Make sure all headers are syncing, and call loadtxoutset again."
+            msg = "Unable to load UTXO snapshot: The base block header (3ecff95c7ba3f293672c46d8a715de346bb5f71f34ec2520f2d8b37dbcaed881) must appear in the headers chain. Make sure all headers are syncing, and call loadtxoutset again."
             assert_raises_rpc_error(-32603, msg, node.loadtxoutset, valid_snapshot_path)
 
     def test_invalid_chainstate_scenarios(self):
@@ -229,7 +230,7 @@ class AssumeutxoTest(BitcoinTestFramework):
             block_hash = node.getblockhash(height)
             node.invalidateblock(block_hash)
             assert_equal(node.getblockcount(), height - 1)
-            msg = "Unable to load UTXO snapshot: The base block header (7cc695046fec709f8c9394b6f928f81e81fd3ac20977bb68760fa1faa7916ea2) is part of an invalid chain."
+            msg = "Unable to load UTXO snapshot: The base block header (3ecff95c7ba3f293672c46d8a715de346bb5f71f34ec2520f2d8b37dbcaed881) is part of an invalid chain."
             assert_raises_rpc_error(-32603, msg, node.loadtxoutset, dump_output_path)
             node.reconsiderblock(block_hash)
 
@@ -240,7 +241,7 @@ class AssumeutxoTest(BitcoinTestFramework):
         assert_equal(n3.getblockcount(), START_HEIGHT)
 
         self.log.info("Check importing a snapshot where current chain-tip is not an ancestor of the snapshot block but has less work")
-        # Generate a divergent chain in n3 up to 298
+        # Generate a divergent chain in n3 up to SNAPSHOT_BASE_HEIGHT - 1
         self.generate(n3, nblocks=99, sync_fun=self.no_op)
         assert_equal(n3.getblockcount(), SNAPSHOT_BASE_HEIGHT - 1)
 
@@ -453,7 +454,7 @@ class AssumeutxoTest(BitcoinTestFramework):
         # In order for the snapshot to activate, we have to ferry over the new
         # headers to n1 and n2 so that they see the header of the snapshot's
         # base block while disconnected from n0.
-        for i in range(1, 300):
+        for i in range(1, SNAPSHOT_BASE_HEIGHT + 1):
             block = n0.getblock(n0.getblockhash(i), 0)
             # make n1 and n2 aware of the new header, but don't give them the
             # block.
@@ -470,7 +471,7 @@ class AssumeutxoTest(BitcoinTestFramework):
         def check_dump_output(output):
             assert_equal(
                 output['txoutset_hash'],
-                "d2b051ff5e8eef46520350776f4100dd710a63447a8e01d917e92e79751a63e2")
+                "2a5fd472704168b44dd2249ad931ac1af66dd44ef7aa610125b168fb3b420845")
             assert_equal(output["nchaintx"], blocks[SNAPSHOT_BASE_HEIGHT].chain_tx)
 
         check_dump_output(dump_output)
@@ -500,7 +501,7 @@ class AssumeutxoTest(BitcoinTestFramework):
         dump_output4 = n0.dumptxoutset(path='utxos4.dat', rollback=prev_snap_height)
         assert_equal(
             dump_output4['txoutset_hash'],
-            "45ac2777b6ca96588210e2a4f14b602b41ec37b8b9370673048cc0af434a1ec8")
+            "181a18bf0e94baf0577e75e574ab5e4bd9ab109717c8aee5aeb1db280a774eb6")
         assert_not_equal(sha256sum_file(dump_output['path']), sha256sum_file(dump_output4['path']))
 
         # Use a hash instead of a height
@@ -615,14 +616,15 @@ class AssumeutxoTest(BitcoinTestFramework):
         n1.getblock(stale_hash)
 
         self.log.info("Submit a spending transaction for a snapshot chainstate coin to the mempool")
-        # spend the coinbase output of the first block that is not available on node1
+        # spend an output of the first block that is not available on node1.
+        # S256: COINBASE_MATURITY is 200, longer than the 100 blocks node1 has
+        # not downloaded, so none of their coinbases is mature: spend the
+        # MiniWallet transaction's output in that block (Bitcoin: its coinbase).
         spend_coin_blockhash = n1.getblockhash(START_HEIGHT + 1)
         assert_raises_rpc_error(-1, "Block not available (not fully downloaded)", n1.getblock, spend_coin_blockhash)
-        prev_tx = n0.getblock(spend_coin_blockhash, 3)['tx'][0]
-        prevout = {"txid": prev_tx['txid'], "vout": 0, "scriptPubKey": prev_tx['vout'][0]['scriptPubKey']['hex']}
-        privkey = n0.get_deterministic_priv_key().key
-        raw_tx = n1.createrawtransaction([prevout], {getnewdestination()[2]: 24.99})
-        signed_tx = n1.signrawtransactionwithkey(raw_tx, [privkey], [prevout])['hex']
+        prev_tx = n0.getblock(spend_coin_blockhash, 3)['tx'][1]
+        utxo = self.mini_wallet.get_utxo(txid=prev_tx['txid'], vout=0)
+        signed_tx = self.mini_wallet.create_self_transfer(utxo_to_spend=utxo)['hex']
         signed_txid = tx_from_hex(signed_tx).txid_hex
 
         assert n1.gettxout(prev_tx['txid'], 0) is not None
@@ -638,9 +640,14 @@ class AssumeutxoTest(BitcoinTestFramework):
         dumb_sync_blocks(src=n0, dst=n1, height=PAUSE_HEIGHT)
 
         self.log.info("Checking that blocks are segmented on disk")
+        # S256: the cached chain (CACHE_HEIGHT + 1 blocks) already fills more
+        # than one 64 KiB -fastprune blockfile, so the stale block submitted
+        # above opens a second normal blockfile and the assumed blocks start
+        # in the third (Bitcoin: 00000 normal, 00001 assumed).
         assert self.has_blockfile(n1, "00000"), "normal blockfile missing"
-        assert self.has_blockfile(n1, "00001"), "assumed blockfile missing"
-        assert not self.has_blockfile(n1, "00002"), "too many blockfiles"
+        assert self.has_blockfile(n1, "00001"), "second normal blockfile missing"
+        assert self.has_blockfile(n1, "00002"), "assumed blockfile missing"
+        assert not self.has_blockfile(n1, "00003"), "too many blockfiles"
 
         # The node must remain in 'limited' mode
         self.assert_only_network_limited_service(n1)
@@ -714,7 +721,7 @@ class AssumeutxoTest(BitcoinTestFramework):
             self.log.info(f"Check that restarting with {reindex_arg} will delete the snapshot chainstate")
             self.restart_node(2, extra_args=[reindex_arg, *self.extra_args[2]])
             assert_equal(1, len(n2.getchainstates()["chainstates"]))
-            for i in range(1, 300):
+            for i in range(1, SNAPSHOT_BASE_HEIGHT + 1):
                 block = n0.getblock(n0.getblockhash(i), 0)
                 n2.submitheader(block)
             loaded = n2.loadtxoutset(dump_output['path'])
