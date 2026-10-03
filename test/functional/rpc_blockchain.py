@@ -220,6 +220,10 @@ class BlockchainTest(BitcoinTestFramework):
             'bip65': {'type': 'buried', 'active': True, 'height': 4},
             'csv': {'type': 'buried', 'active': True, 'height': 5},
             'segwit': {'type': 'buried', 'active': True, 'height': 6},
+            # S256 buried deployments, active from genesis on regtest
+            # (AuxpowStartHeight, LwmaStartHeight in src/kernel/chainparams.cpp)
+            'auxpow': {'type': 'buried', 'active': True, 'height': 0},
+            'lwma': {'type': 'buried', 'active': True, 'height': 0},
             'testdummy': {
                 'type': 'bip9',
                 'bip9': {
@@ -362,7 +366,8 @@ class BlockchainTest(BitcoinTestFramework):
         node = self.nodes[0]
         res = node.gettxoutsetinfo()
 
-        assert_equal(res['total_amount'], Decimal('8725.00000000'))
+        # S256: 149 * 100 + 51 * 50 (100-coin subsidy, halving at 150; Bitcoin: 8725)
+        assert_equal(res['total_amount'], Decimal('17450.00000000'))
         assert_equal(res['transactions'], HEIGHT)
         assert_equal(res['height'], HEIGHT)
         assert_equal(res['txouts'], HEIGHT)
@@ -437,7 +442,7 @@ class BlockchainTest(BitcoinTestFramework):
         # Validate the gettxout response
         assert_equal(txout['bestblock'], best_block_hash)
         assert_equal(txout['confirmations'], 1)
-        assert_equal(txout['value'], 25)
+        assert_equal(txout['value'], 50)  # S256: 100 >> 1 at height 200 (Bitcoin: 25)
         assert_equal(txout['scriptPubKey']['address'], self.wallet.get_address())
         assert_equal(txout['scriptPubKey']['hex'], self.wallet.get_output_script().hex())
         decoded_script = node.decodescript(self.wallet.get_output_script().hex())
