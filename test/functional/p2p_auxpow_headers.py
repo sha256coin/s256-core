@@ -181,8 +181,10 @@ class AuxpowHeadersP2PTest(BitcoinTestFramework):
         sender = node.add_p2p_connection(HeadersCollector())
         builder_address = builder.get_deterministic_priv_key().address
 
-        for padding, expect_headers in ((1_000, True), (750_000, False)):
-            # The listener has the tip header, so announcements can connect.
+        def announce_three(padding):
+            """Merge-mine three blocks and have the node connect them, after
+            the listener has the tip header. Return the hashes and what the
+            listener received: the headers messages and the inv'd hashes."""
             getheaders = msg_getheaders()
             getheaders.locator.vHave = [int(node.getbestblockhash(), 16)]
             listener.send_and_ping(getheaders)
@@ -191,20 +193,41 @@ class AuxpowHeadersP2PTest(BitcoinTestFramework):
             blocks = [bytes.fromhex(builder.getblock(h, 0)) for h in hashes]
             headers = [from_hex(CBlockHeader(), b.hex()) for b in blocks]
             # Headers first, then the blocks in reverse, so the node connects
-            # all three at once and announces them together.
+            # all three on the last block.
             sender.send_and_ping(msg_headers(headers))
             for b in reversed(blocks):
                 sender.send_and_ping(msg_raw(b"block", b))
             node.waitforblock(hashes[-1])
+            node.syncwithvalidationinterfacequeue()
             listener.sync_with_ping()
-            announced = [h.hash_hex for msg in listener.headers_msgs for h in msg]
             inved = [f"{i.hash:064x}" for msg in listener.invs for i in msg]
-            if expect_headers:
-                assert_equal(announced, hashes)
-            else:
-                assert_equal(announced, [])
-                assert_equal(inved, [hashes[-1]])
+            return hashes, list(listener.headers_msgs), inved
 
+        # The node announces new tips per validation callback: it connects the
+        # blocks one at a time (ActivateBestChain releases cs_main after each
+        # one), so a busy node may announce them in more than one batch.
+        hashes, msgs, inved = announce_three(1_000)
+        assert_equal([h.hash_hex for msg in msgs for h in msg], hashes)
+        assert_equal(inved, [])
+
+        # Three ~750 KB headers (~2.25 MB) don't fit in one message. Whatever
+        # the batching, no headers message may exceed the threshold and the
+        # tip must be announced; a batch that would exceed it is an inv for
+        # its last block. Retry until the node batches all three together so
+        # the inv fallback itself is exercised.
+        for attempt in range(5):
+            hashes, msgs, inved = announce_three(750_000)
+            announced = [h.hash_hex for msg in msgs for h in msg]
+            for msg in msgs:
+                assert_greater_than_or_equal(THRESHOLD_HEADERS_SIZE, sum(len(h.serialize()) for h in msg))
+            assert hashes[-1] in announced + inved
+            assert set(inved) <= set(hashes)
+            if announced == []:
+                assert_equal(inved, [hashes[-1]])
+                break
+            self.log.info(f"Announcements split into {len(msgs)} headers message(s) and {len(inved)} inv(s); retrying")
+        else:
+            assert False, "the node never announced three large headers in one batch"
 
 if __name__ == '__main__':
     AuxpowHeadersP2PTest(__file__).main()
