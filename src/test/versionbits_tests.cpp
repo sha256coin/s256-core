@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <auxpow.h>
 #include <chain.h>
 #include <chainparams.h>
 #include <consensus/params.h>
@@ -13,6 +14,8 @@
 #include <versionbits_impl.h>
 
 #include <boost/test/unit_test.hpp>
+
+#include <set>
 
 /* Define a virtual block time, one block per 10 minutes after Nov 14 2014, 0:55:36am */
 static int32_t TestTime(int nHeight) { return 1415926536 + 600 * nHeight; }
@@ -552,6 +555,39 @@ BOOST_AUTO_TEST_CASE(versionbits_no_warning_from_pre_fix_taproot_signaling)
                              "bit 2 flagged as unknown-activation (is_active=" << is_active
                                  << ") -- pre-fix Taproot signaling history is leaking through again");
     }
+}
+
+/**
+ * S256: merge-mined blocks carry VERSION_AUXPOW_BIT (bit 8). Once most
+ * blocks are merge-mined, the unknown-rules scan must not report bit 8 as a
+ * new deployment. An unassigned bit signalled the same way still is.
+ */
+BOOST_AUTO_TEST_CASE(versionbits_no_warning_from_auxpow_bit)
+{
+    ArgsManager args;
+    const auto chainParams = CreateChainParams(args, ChainType::MAIN);
+    const int start = chainParams->GetConsensus().MinBIP9WarningHeight;
+    constexpr int unknown_bit = 9;
+
+    const auto unknown_bits = [&](int32_t version) {
+        std::vector<std::unique_ptr<CBlockIndex>> chain;
+        CBlockIndex* tip = nullptr;
+        for (int h = 0; h <= start + 3 * 2016; ++h) {
+            auto pindex = std::make_unique<CBlockIndex>();
+            pindex->nHeight = h;
+            pindex->nVersion = h >= start ? version : VERSIONBITS_TOP_BITS;
+            pindex->pprev = tip;
+            tip = pindex.get();
+            chain.push_back(std::move(pindex));
+        }
+        VersionBitsCache cache;
+        std::set<int> bits;
+        for (const auto& [bit, is_active] : cache.CheckUnknownActivations(tip, *chainParams)) bits.insert(bit);
+        return bits;
+    };
+
+    BOOST_CHECK(unknown_bits(VERSIONBITS_TOP_BITS | VERSION_AUXPOW_BIT).empty());
+    BOOST_CHECK(unknown_bits(VERSIONBITS_TOP_BITS | VERSION_AUXPOW_BIT | (1 << unknown_bit)) == std::set<int>{unknown_bit});
 }
 
 BOOST_AUTO_TEST_SUITE_END()

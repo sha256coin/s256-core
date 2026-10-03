@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <auxpow.h>
 #include <consensus/params.h>
 #include <deploymentinfo.h>
 #include <kernel/chainparams.h>
@@ -335,6 +336,9 @@ std::vector<std::pair<int, bool>> VersionBitsCache::CheckUnknownActivations(cons
     LOCK(m_mutex);
     std::vector<std::pair<int, bool>> result;
     for (int bit = 0; bit < VERSIONBITS_NUM_BITS; ++bit) {
+        // S256: the auxpow bit is set on every merge-mined block; it is not
+        // a deployment signal.
+        if ((int32_t{1} << bit) == VERSION_AUXPOW_BIT) continue;
         WarningBitsConditionChecker checker(chainparams, m_caches, bit);
         ThresholdState state = checker.GetStateFor(pindex, m_warning_caches.at(bit));
         if (state == ACTIVE || state == LOCKED_IN) {
