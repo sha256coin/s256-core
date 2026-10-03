@@ -39,6 +39,11 @@ std::optional<ConfigError> InitConfig(ArgsManager& args, SettingsAbortFn setting
             return ConfigError{ConfigStatus::FAILED, strprintf(_("Error reading configuration file: %s"), error)};
         }
 
+        // S256: there is no default signet; a signet node needs its own challenge.
+        if (args.GetChainType() == ChainType::SIGNET && args.GetArgs("-signetchallenge").empty()) {
+            return ConfigError{ConfigStatus::FAILED, Untranslated("-signet requires -signetchallenge: SHA256Coin has no default signet.")};
+        }
+
         // Check for chain settings (Params() calls are only valid after this clause)
         SelectParams(args.GetChainType());
 
