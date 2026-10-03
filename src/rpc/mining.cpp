@@ -8,6 +8,7 @@
 #include <auxpow.h>
 #include <chain.h>
 #include <chainparams.h>
+#include <common/args.h>
 #include <chainparamsbase.h>
 #include <common/system.h>
 #include <consensus/amount.h>
@@ -25,6 +26,7 @@
 #include <node/miner.h>
 #include <node/warnings.h>
 #include <policy/ephemeral_policy.h>
+#include <policy/policy.h>
 #include <pow.h>
 #include <rpc/blockchain.h>
 #include <rpc/mining.h>
@@ -1243,7 +1245,12 @@ static RPCHelpMan createauxblock()
         // -- see node/miner.cpp. Dormant on the live chain (already well past
         // height 16) but needed for correctness on any fresh low-height chain
         // (e.g. testnet/regtest), matching the other block-creating RPCs here.
-        std::unique_ptr<BlockTemplate> block_template(miner.createNewBlock({ .coinbase_output_script = coinbase_output_script, .include_dummy_extranonce = true }));
+        // The auxpow is attached only at submission and counts towards the
+        // block weight, so leave room for it beyond the usual reserve.
+        const ArgsManager& args{EnsureArgsman(node)};
+        const size_t reserved_weight{static_cast<size_t>(args.GetIntArg("-blockreservedweight", DEFAULT_BLOCK_RESERVED_WEIGHT) +
+                                                         args.GetIntArg("-auxpowreservedweight", DEFAULT_AUXPOW_RESERVED_WEIGHT))};
+        std::unique_ptr<BlockTemplate> block_template(miner.createNewBlock({ .block_reserved_weight = reserved_weight, .coinbase_output_script = coinbase_output_script, .include_dummy_extranonce = true }));
         if (!block_template) {
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Could not create new block template");
         }

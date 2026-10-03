@@ -24,6 +24,11 @@ class CScript;
 static constexpr unsigned int DEFAULT_BLOCK_MAX_WEIGHT{MAX_BLOCK_WEIGHT};
 /** Default for -blockreservedweight **/
 static constexpr unsigned int DEFAULT_BLOCK_RESERVED_WEIGHT{8000};
+/** S256: default for -auxpowreservedweight, the weight createauxblock reserves
+ * on top of -blockreservedweight for the auxpow attached at submission (it
+ * counts as non-witness data, 4 WU per byte): room for a ~10 KB parent
+ * coinbase plus branches, e.g. pools paying out in the coinbase. */
+static constexpr unsigned int DEFAULT_AUXPOW_RESERVED_WEIGHT{40000};
 /** Default sigops cost to reserve for coinbase transaction outputs when creating block templates. */
 static constexpr unsigned int DEFAULT_COINBASE_OUTPUT_MAX_ADDITIONAL_SIGOPS{400};
 /** This accounts for the block header, var_int encoding of the transaction count and a minimally viable

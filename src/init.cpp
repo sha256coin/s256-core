@@ -699,6 +699,7 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
 
     argsman.AddArg("-blockmaxweight=<n>", strprintf("Set maximum BIP141 block weight (default: %d)", DEFAULT_BLOCK_MAX_WEIGHT), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockreservedweight=<n>", strprintf("Reserve space for the fixed-size block header plus the largest coinbase transaction the mining software may add to the block. Only affects mining RPC clients, not IPC clients. (default: %d).", DEFAULT_BLOCK_RESERVED_WEIGHT), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
+    argsman.AddArg("-auxpowreservedweight=<n>", strprintf("Additional weight createauxblock reserves, on top of -blockreservedweight, for the auxpow (parent coinbase, merkle branches and header) attached when the block is submitted (default: %d).", DEFAULT_AUXPOW_RESERVED_WEIGHT), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockmintxfee=<amt>", strprintf("Set lowest fee rate (in %s/kvB) for transactions to be included in block creation. (default: %s)", CURRENCY_UNIT, FormatMoney(DEFAULT_BLOCK_MIN_TX_FEE)), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockversion=<n>", "Override block version to test forking scenarios", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::BLOCK_CREATION);
 
@@ -1094,6 +1095,10 @@ bool AppInitParameterInteraction(const ArgsManager& args)
         }
         if (block_reserved_weight < MINIMUM_BLOCK_RESERVED_WEIGHT) {
             return InitError(strprintf(_("Specified -blockreservedweight (%d) is lower than minimum safety value of (%d)"), block_reserved_weight, MINIMUM_BLOCK_RESERVED_WEIGHT));
+        }
+        const auto auxpow_reserved_weight = args.GetIntArg("-auxpowreservedweight", DEFAULT_AUXPOW_RESERVED_WEIGHT);
+        if (auxpow_reserved_weight < 0 || block_reserved_weight + auxpow_reserved_weight > MAX_BLOCK_WEIGHT) {
+            return InitError(strprintf(_("Specified -auxpowreservedweight (%d) must be at least 0 and, with -blockreservedweight, not exceed the consensus maximum block weight (%d)"), auxpow_reserved_weight, MAX_BLOCK_WEIGHT));
         }
     }
 
