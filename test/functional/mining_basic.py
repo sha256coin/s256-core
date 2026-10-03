@@ -14,6 +14,7 @@ import copy
 from decimal import Decimal
 
 from test_framework.blocktools import (
+    COINBASE_MATURITY,
     create_coinbase,
     get_witness_script,
     NORMAL_GBT_REQUEST_PARAMS,
@@ -78,9 +79,11 @@ class MiningTest(BitcoinTestFramework):
         assert_equal(mining_info['currentblockweight'], DEFAULT_BLOCK_RESERVED_WEIGHT)
 
         self.log.info('test blockversion')
-        self.restart_node(0, extra_args=[f'-mocktime={t}', '-blockversion=1337'])
+        # S256: upstream's 1337 (0x539) has bit 8 set, the auxpow bit
+        # (VERSION_AUXPOW_BIT, src/auxpow.h); use 1337 without it.
+        self.restart_node(0, extra_args=[f'-mocktime={t}', '-blockversion=1081'])
         self.connect_nodes(0, 1)
-        assert_equal(1337, self.nodes[0].getblocktemplate(NORMAL_GBT_REQUEST_PARAMS)['version'])
+        assert_equal(1081, self.nodes[0].getblocktemplate(NORMAL_GBT_REQUEST_PARAMS)['version'])
         self.restart_node(0, extra_args=[f'-mocktime={t}'])
         self.connect_nodes(0, 1)
         assert_equal(VERSIONBITS_TOP_BITS + (1 << VERSIONBITS_DEPLOYMENT_TESTDUMMY_BIT), self.nodes[0].getblocktemplate(NORMAL_GBT_REQUEST_PARAMS)['version'])
@@ -96,7 +99,7 @@ class MiningTest(BitcoinTestFramework):
         self.generate(wallet_sigops, 1, sync_fun=self.no_op)
 
         # Mature with regular coinbases to prevent interference with other tests
-        self.generate(self.wallet, 100, sync_fun=self.no_op)
+        self.generate(self.wallet, COINBASE_MATURITY, sync_fun=self.no_op)
 
         # Generate three transactions that must be mined in sequence
         #
