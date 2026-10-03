@@ -1223,6 +1223,17 @@ static RPCHelpMan createauxblock()
     ChainstateManager& chainman = EnsureChainman(node);
     const CTxMemPool& mempool = EnsureMemPool(node);
 
+    // Like getblocktemplate (and Namecoin's createauxblock): don't hand out
+    // templates on a tip that is probably stale. Test chains are exempt.
+    if (!miner.isTestChain()) {
+        if (EnsureConnman(node).GetNodeCount(ConnectionDirection::Both) == 0) {
+            throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, CLIENT_NAME " is not connected!");
+        }
+        if (miner.isInitialBlockDownload()) {
+            throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, CLIENT_NAME " is in initial sync and waiting for blocks...");
+        }
+    }
+
     // Held across template creation (which takes cs_main; nothing takes
     // g_auxblock_mutex under cs_main), so concurrent pollers share one
     // template instead of each building their own.

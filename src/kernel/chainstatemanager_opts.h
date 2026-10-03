@@ -21,7 +21,12 @@
 class CChainParams;
 class ValidationSignals;
 
-static constexpr auto DEFAULT_MAX_TIP_AGE{24h};
+//! S256: 7 days rather than Bitcoin's 24 hours. Block gaps of several hours
+//! happen on S256, and a node restarted with a tip older than this is in
+//! initial block download, where getblocktemplate and createauxblock refuse to
+//! hand out templates. Fresh nodes are still held in IBD by the minimum chain
+//! work.
+static constexpr auto DEFAULT_MAX_TIP_AGE{7 * 24h};
 
 namespace kernel {
 

@@ -3332,16 +3332,6 @@ void ChainstateManager::UpdateIBDStatus()
     AssertLockHeld(cs_main);
     if (!m_cached_is_ibd.load(std::memory_order_relaxed)) return;
     if (m_blockman.LoadingBlocks()) return;
-    // S256: exit IBD immediately at genesis block for new chain launch --
-    // a brand-new chain has zero chain work, which would otherwise never
-    // meet MinimumChainWork() (the bar is set ahead of genesis) without the
-    // node first being able to mine/relay, a chicken-and-egg bootstrap
-    // deadlock unique to launching a fresh chain from nothing.
-    if (CurrentChainstate().m_chain.Tip() && CurrentChainstate().m_chain.Tip()->nHeight == 0) {
-        LogInfo("S256: At genesis block, exiting IBD\n");
-        m_cached_is_ibd.store(false, std::memory_order_relaxed);
-        return;
-    }
     if (!CurrentChainstate().m_chain.IsTipRecent(MinimumChainWork(), m_options.max_tip_age)) return;
     LogInfo("Leaving InitialBlockDownload (latching to false)");
     m_cached_is_ibd.store(false, std::memory_order_relaxed);
