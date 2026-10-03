@@ -66,6 +66,15 @@ int CAuxPow::GetExpectedIndex(uint32_t nNonce, int nChainId, unsigned int h)
 bool CAuxPow::CheckAuxPow(const uint256& hashAuxBlock, unsigned int nBits, int nChainId,
                            const Consensus::Params& params, BlockValidationState& state) const
 {
+    // --- The actual proof-of-work: parent header hash vs. THIS chain's target -
+    // Checked first: it hashes only the 80-byte parent header, so a proof
+    // without real work is rejected before the (attacker-sized) parent
+    // coinbase is hashed and the merkle branches are walked.
+    if (!CheckProofOfWork(parentBlock.GetHash(), nBits, params)) {
+        return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "auxpow-high-hash",
+                              "auxpow parent block does not meet this chain's required proof-of-work target");
+    }
+
     if (!coinbaseTx) {
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "auxpow-no-coinbase",
                               "auxpow is missing its parent coinbase transaction");
@@ -192,12 +201,6 @@ bool CAuxPow::CheckAuxPow(const uint256& hashAuxBlock, unsigned int nBits, int n
     if (computedParentRoot != parentBlock.hashMerkleRoot) {
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "auxpow-coinbase-merkle-mismatch",
                               "auxpow coinbase merkle branch does not connect to the parent block's merkle root");
-    }
-
-    // --- The actual proof-of-work: parent header hash vs. THIS chain's target -
-    if (!CheckProofOfWork(parentBlock.GetHash(), nBits, params)) {
-        return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "auxpow-high-hash",
-                              "auxpow parent block does not meet this chain's required proof-of-work target");
     }
 
     return true;

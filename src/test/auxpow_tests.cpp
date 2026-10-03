@@ -444,6 +444,28 @@ BOOST_AUTO_TEST_CASE(auxpow_duplicate_tag_rejected)
     }
 }
 
+BOOST_AUTO_TEST_CASE(auxpow_parent_pow_checked_first)
+{
+    // A proof without the parent work is rejected on the parent header alone,
+    // before anything in its (possibly huge) coinbase or branches is looked at.
+    auto block = AuxBlockCandidate(17);
+    const uint256 hashAuxBlock = block->GetHash();
+    const Consensus::Params& params = Params().GetConsensus();
+    const unsigned int veryStrictBits = arith_uint256(1).GetCompact();
+
+    auto auxpow = BuildValidAuxPow(hashAuxBlock, block->nBits);
+    auxpow.coinbaseTx = nullptr;
+    BlockValidationState state;
+    BOOST_CHECK(!auxpow.CheckAuxPow(hashAuxBlock, veryStrictBits, params.nAuxpowChainId, params, state));
+    BOOST_CHECK_EQUAL(state.GetRejectReason(), "auxpow-high-hash");
+
+    auxpow = BuildValidAuxPow(hashAuxBlock, block->nBits);
+    auxpow.vMerkleBranch.assign(100000, uint256{uint8_t{1}});
+    state = BlockValidationState{};
+    BOOST_CHECK(!auxpow.CheckAuxPow(hashAuxBlock, veryStrictBits, params.nAuxpowChainId, params, state));
+    BOOST_CHECK_EQUAL(state.GetRejectReason(), "auxpow-high-hash");
+}
+
 BOOST_AUTO_TEST_CASE(auxpow_tag_root_byte_order)
 {
     // The tag carries the root in the order of its hex form (Namecoin's and
