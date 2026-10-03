@@ -1181,7 +1181,7 @@ static RPCHelpMan createauxblock()
         RPCResult{
             RPCResult::Type::OBJ, "", "",
             {
-                {RPCResult::Type::STR_HEX, "hash", "hash of the new aux block; embed this in the parent chain's merge-mining coinbase tag"},
+                {RPCResult::Type::STR_HEX, "hash", "hash of the new aux block. Embed it in the parent coinbase's merge-mining tag (fabe6d6d), as the decoded bytes of this hex in the same order (for several aux chains, the merkle root of their hashes, byte-reversed like this hex)"},
                 {RPCResult::Type::NUM, "chainid", "this chain's merge-mining chain ID"},
                 {RPCResult::Type::STR_HEX, "previousblockhash", "hash of the current S256 tip this template builds on"},
                 {RPCResult::Type::NUM, "coinbasevalue", "value of the block reward, in satoshis"},

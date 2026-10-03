@@ -7,10 +7,12 @@
 - the tagged transaction must be the parent's coinbase (merkle index 0)
 - one parent commits to at most one S256 block: the chain merkle index must
   be the slot expected for S256's chain ID, and the tag may appear only once
+- the tag carries the createauxblock hash bytes in hex order (Namecoin's)
 - an accepted aux block relays to a peer, a rejected one does not
 """
 
 from test_framework.auxpow import (
+    MERGE_MINING_HEADER,
     expected_index,
     merge_mining_tag,
     merkle_leaf,
@@ -55,6 +57,16 @@ class AuxpowCommitmentTest(BitcoinTestFramework):
         addr2 = self.nodes[1].get_deterministic_priv_key().address
         self.generatetoaddress(node, 20, addr1)
 
+        self.log.info("Tag byte order: the createauxblock hash hex, decoded as is")
+        aux = node.createauxblock(addr1)
+        old_order = MERGE_MINING_HEADER + bytes.fromhex(aux["hash"])[::-1] + (1).to_bytes(4, "little") + (0).to_bytes(4, "little")
+        cb = parent_tx(CScript([old_order]))
+        self.assert_rejected(aux, serialize_auxpow(cb, [], 0, [], 0, txid(cb), aux["bits"]), "auxpow-chain-merkle-mismatch")
+        aux = node.createauxblock(addr1)
+        pool_tag = MERGE_MINING_HEADER + bytes.fromhex(aux["hash"]) + (1).to_bytes(4, "little") + (0).to_bytes(4, "little")
+        cb = parent_tx(CScript([pool_tag]))
+        self.assert_accepted(aux, serialize_auxpow(cb, [], 0, [], 0, txid(cb), aux["bits"]))
+
         self.log.info("Reject a tag in an ordinary parent transaction (not the coinbase)")
         aux = node.createauxblock(addr1)
         coinbase = parent_tx(CScript([b"\x01\x00"]))
@@ -67,7 +79,7 @@ class AuxpowCommitmentTest(BitcoinTestFramework):
         root = hash256(txid(coinbase) + txid(tagged))
         self.assert_rejected(aux, serialize_auxpow(tagged, [txid(coinbase)], 0, [], 0, root, aux["bits"]),
                              "auxpow-coinbase-merkle-mismatch")
-        assert_equal(node.getblockcount(), 20)
+        assert_equal(node.getblockcount(), 21)
 
         self.log.info("Accept the tag in the coinbase of a multi-transaction parent")
         aux = node.createauxblock(addr1)
@@ -105,7 +117,7 @@ class AuxpowCommitmentTest(BitcoinTestFramework):
             self.assert_rejected(target, serialize_auxpow(cb, [], 0, [], 0, txid(cb), target["bits"]),
                                  "auxpow-multiple-merge-mining-tags")
 
-        assert_equal(node.getblockcount(), 22)
+        assert_equal(node.getblockcount(), 23)
         assert_equal(self.nodes[1].getbestblockhash(), node.getbestblockhash())
 
 

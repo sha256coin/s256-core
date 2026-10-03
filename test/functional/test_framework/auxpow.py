@@ -49,8 +49,9 @@ def merkle_leaf(block_hash_hex):
 
 def merge_mining_tag(chain_root, size=1, nonce=0):
     """The merge-mining tag committing to chain_root (internal byte order) in
-    a tree of `size` leaves."""
-    return (MERGE_MINING_HEADER + chain_root
+    a tree of `size` leaves. The tag carries the root reversed, i.e. in the
+    order of its hex form."""
+    return (MERGE_MINING_HEADER + chain_root[::-1]
             + size.to_bytes(4, "little") + nonce.to_bytes(4, "little"))
 
 

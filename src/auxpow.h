@@ -41,6 +41,8 @@ static const unsigned int MAX_CHAIN_MERKLE_BRANCH_LENGTH = 30;
  * inside a parent-chain coinbase's scriptSig, per the conventional
  * Namecoin/Dogecoin-style merged-mining format:
  *   0xfabe6d6d ++ chainMerkleRoot(32) ++ merkleSize(4, LE) ++ merkleNonce(4, LE)
+ * with chainMerkleRoot byte-reversed relative to uint256's internal order
+ * (the order of its hex form), as in Namecoin and Dogecoin.
  */
 static const unsigned char MERGE_MINING_HEADER[4] = {0xfa, 0xbe, 0x6d, 0x6d};
 

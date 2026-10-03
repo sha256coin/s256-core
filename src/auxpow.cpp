@@ -124,9 +124,12 @@ bool CAuxPow::CheckAuxPow(const uint256& hashAuxBlock, unsigned int nBits, int n
                               "auxpow parent coinbase merge-mining tag is truncated");
     }
 
+    // The tag carries the root byte-reversed relative to uint256's internal
+    // order, i.e. in the order of its hex form (for a single aux chain, the
+    // createauxblock "hash" hex decoded as is), as Namecoin and Dogecoin do.
     auto field = tagBegin + TAG_HEADER_LEN;
     uint256 chainMerkleRoot;
-    std::copy(field, field + TAG_ROOT_LEN, chainMerkleRoot.begin());
+    std::reverse_copy(field, field + TAG_ROOT_LEN, chainMerkleRoot.begin());
     field += TAG_ROOT_LEN;
 
     uint32_t merkleSize = 0;

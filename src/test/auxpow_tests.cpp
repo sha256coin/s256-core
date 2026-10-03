@@ -17,6 +17,7 @@
 #include <streams.h>
 #include <test/util/setup_common.h>
 #include <util/check.h>
+#include <util/strencodings.h>
 #include <validation.h>
 #include <validationinterface.h>
 
@@ -94,14 +95,14 @@ struct AuxPowTestingSetup : public RegTestingSetup {
     }
 
     // Builds a raw scriptSig byte sequence carrying a well-formed
-    // merge-mining tag: 0xfabe6d6d ++ chainMerkleRoot(32) ++ size(4 LE) ++ nonce(4 LE).
+    // merge-mining tag: 0xfabe6d6d ++ chainMerkleRoot(32, reversed) ++ size(4 LE) ++ nonce(4 LE).
     CScript BuildTaggedScriptSig(const uint256& chainMerkleRoot, uint32_t merkleSize, uint32_t merkleNonce, bool includeTag = true)
     {
         std::vector<unsigned char> vch;
         vch.push_back(0x51); // arbitrary prefix byte (e.g. block-height-ish marker), irrelevant to the tag scan
         if (includeTag) {
             vch.insert(vch.end(), std::begin(MERGE_MINING_HEADER), std::end(MERGE_MINING_HEADER));
-            vch.insert(vch.end(), chainMerkleRoot.begin(), chainMerkleRoot.end());
+            vch.insert(vch.end(), std::make_reverse_iterator(chainMerkleRoot.end()), std::make_reverse_iterator(chainMerkleRoot.begin())); // byte-reversed, as in the hex form
             for (int i = 0; i < 4; i++) vch.push_back(static_cast<unsigned char>((merkleSize >> (8 * i)) & 0xff));
             for (int i = 0; i < 4; i++) vch.push_back(static_cast<unsigned char>((merkleNonce >> (8 * i)) & 0xff));
         }
@@ -441,6 +442,37 @@ BOOST_AUTO_TEST_CASE(auxpow_duplicate_tag_rejected)
         BOOST_CHECK(!auxpow.CheckAuxPow(block->GetHash(), block->nBits, params.nAuxpowChainId, params, state));
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "auxpow-multiple-merge-mining-tags");
     }
+}
+
+BOOST_AUTO_TEST_CASE(auxpow_tag_root_byte_order)
+{
+    // The tag carries the root in the order of its hex form (Namecoin's and
+    // Dogecoin's): for one aux chain, the block hash's GetHex() decoded as is.
+    auto block = AuxBlockCandidate(16);
+    const uint256 hashAuxBlock = block->GetHash();
+    const Consensus::Params& params = Params().GetConsensus();
+
+    const auto tagged = [&](const std::vector<unsigned char>& root) {
+        std::vector<unsigned char> vch(std::begin(MERGE_MINING_HEADER), std::end(MERGE_MINING_HEADER));
+        vch.insert(vch.end(), root.begin(), root.end());
+        vch.insert(vch.end(), {1, 0, 0, 0, 0, 0, 0, 0}); // size 1, nonce 0
+        const auto coinbase = ParentTx(CScript() << vch);
+        CAuxPow auxpow;
+        auxpow.coinbaseTx = coinbase;
+        auxpow.nIndex = 0;
+        auxpow.nChainIndex = 0;
+        auxpow.parentBlock = MineParentHeader(coinbase, block->nBits);
+        return auxpow;
+    };
+
+    BlockValidationState state;
+    BOOST_CHECK(tagged(ParseHex(hashAuxBlock.GetHex())).CheckAuxPow(hashAuxBlock, block->nBits, params.nAuxpowChainId, params, state));
+    BOOST_CHECK(state.IsValid());
+
+    const std::vector<unsigned char> internal(hashAuxBlock.begin(), hashAuxBlock.end());
+    state = BlockValidationState{};
+    BOOST_CHECK(!tagged(internal).CheckAuxPow(hashAuxBlock, block->nBits, params.nAuxpowChainId, params, state));
+    BOOST_CHECK_EQUAL(state.GetRejectReason(), "auxpow-chain-merkle-mismatch");
 }
 
 BOOST_AUTO_TEST_CASE(auxpow_header_hash_independent_of_auxpow)
