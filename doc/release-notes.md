@@ -108,7 +108,8 @@ Networks
 
 Testnet3 now activates BIP34, BIP65, BIP66, CSV and SegWit from block 1, as testnet4 does. It previously used Bitcoin testnet3's activation heights, which SHA256Coin's testnet never reaches, and that blocked merge-mined testnet blocks. This is a consensus change for testnet3, so the testnet3 chain is being restarted.
 
-- Upgrade, then delete the `blocks/` and `chainstate/` directories under `testnet3/` in your data directory, and start the node. Wallets in `testnet3/wallets/` can be kept.
+- Upgrade, then delete `blocks/`, `chainstate/`, `indexes/` and `mempool.dat` under `testnet3/` in your data directory, and start the node. Wallets in `testnet3/wallets/` can be kept.
+- Miners using `getblocktemplate`: BIP34 and SegWit are active from block 1, so blocks must put the block height in the coinbase scriptSig and include the witness commitment (the template's `default_witness_commitment`) from block 1.
 - Pools: switch the merge-mining proxy to the new tag order when you restart on the reset chain.
 
 ### Testnet4

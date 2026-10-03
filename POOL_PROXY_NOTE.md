@@ -1,6 +1,6 @@
 # Merge-mining proxy changes in SHA256Coin Core 3.0.0
 
-**Who needs this:** anyone who merge-mines SHA256Coin (S256), meaning a pool or merge-mining proxy that calls `createauxblock` / `submitauxblock`, and the operators of the S256 nodes those proxies talk to. Solo miners and pools that mine S256 directly with `getblocktemplate` don't need to change anything.
+**Who needs this:** anyone who merge-mines SHA256Coin (S256), meaning a pool or merge-mining proxy that calls `createauxblock` / `submitauxblock`, and the operators of the S256 nodes those proxies talk to. On mainnet, solo miners and pools that mine S256 directly with `getblocktemplate` don't need to change anything. On the reset testnet3, BIP34 and SegWit are active from block 1. Blocks built from `getblocktemplate` there must put the block height in the coinbase scriptSig (BIP34) and include the witness commitment (the template's `default_witness_commitment`) from block 1.
 
 **Summary:** SHA256Coin Core 3.0.0 is mandatory before mainnet block 17,500, where merged mining (AuxPoW) starts. It changes two things a merge-mining proxy must match: the byte order of the hash in the coinbase tag, and the coinbase merkle index. Blocks built the old way are rejected by 3.0.0 nodes, and blocks built the new way are rejected by older nodes.
 
@@ -42,7 +42,7 @@ How `createauxblock` and `submitauxblock` are used, the auxpow serialization, an
 Switch the proxy **at the same time as the node upgrade**. Don't switch it until the S256 node it talks to runs 3.0.0: an old node rejects every block built the new way.
 
 - **Mainnet:** the first merge-mined block is at 17,500, so use the new order from the start. Upgrade the node to 3.0.0 before 17,500.
-- **Testnet3:** the testnet3 chain is being restarted for 3.0.0. Switch when you restart on the reset chain: upgrade, delete `testnet3/blocks/` and `testnet3/chainstate/` (wallets can be kept), and start the node.
+- **Testnet3:** the testnet3 chain is being restarted for 3.0.0. Switch when you restart on the reset chain: upgrade, delete `testnet3/blocks/`, `testnet3/chainstate/`, `testnet3/indexes/` and `testnet3/mempool.dat` (wallets can be kept), and start the node.
 
 ## How to check
 
