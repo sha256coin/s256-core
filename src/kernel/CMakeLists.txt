@@ -19,6 +19,7 @@ add_library(bitcoinkernel
   disconnected_transactions.cpp
   mempool_removal_reason.cpp
   ../arith_uint256.cpp
+  ../auxpow.cpp
   ../chain.cpp
   ../coins.cpp
   ../compressor.cpp
@@ -43,6 +44,7 @@ add_library(bitcoinkernel
   ../policy/truc_policy.cpp
   ../pow.cpp
   ../primitives/block.cpp
+  ../primitives/pureheader.cpp
   ../primitives/transaction.cpp
   ../pubkey.cpp
   ../random.cpp
