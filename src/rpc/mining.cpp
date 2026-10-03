@@ -1156,6 +1156,18 @@ namespace {
 GlobalMutex g_auxblock_mutex;
 std::map<uint256, std::shared_ptr<CBlock>> g_auxblock_templates GUARDED_BY(g_auxblock_mutex);
 
+//! The template createauxblock currently hands out for each coinbase output
+//! script. Like Namecoin's AuxpowMiner, it is reused until the tip changes,
+//! or until the mempool has changed and the template is a minute old, so
+//! pools polling every few seconds don't pile up one template per call.
+struct CurrentAuxBlock {
+    uint256 hash;
+    unsigned int tx_updated;
+    int64_t created;
+};
+std::map<CScript, CurrentAuxBlock> g_auxblock_current GUARDED_BY(g_auxblock_mutex);
+constexpr int64_t AUXBLOCK_REFRESH_SECONDS{60};
+
 //! Drop any tracked templates no longer built on the current tip, so pollers
 //! that never submit don't leak memory indefinitely.
 void PruneStaleAuxBlockTemplates(const uint256& current_tip) EXCLUSIVE_LOCKS_REQUIRED(g_auxblock_mutex)
@@ -1167,6 +1179,7 @@ void PruneStaleAuxBlockTemplates(const uint256& current_tip) EXCLUSIVE_LOCKS_REQ
             ++it;
         }
     }
+    std::erase_if(g_auxblock_current, [](const auto& entry) { return !g_auxblock_templates.contains(entry.second.hash); });
 }
 } // namespace
 
@@ -1205,42 +1218,61 @@ static RPCHelpMan createauxblock()
     NodeContext& node = EnsureAnyNodeContext(request.context);
     Mining& miner = EnsureMining(node);
     ChainstateManager& chainman = EnsureChainman(node);
+    const CTxMemPool& mempool = EnsureMemPool(node);
 
-    // include_dummy_extranonce: at height <=16, CScript() << nHeight alone
-    // (BIP34) serializes to a single-byte OP_N push, one byte short of the
-    // consensus-required 2-byte-minimum coinbase scriptSig ("bad-cb-length")
-    // -- see node/miner.cpp. Dormant on the live chain (already well past
-    // height 16) but needed for correctness on any fresh low-height chain
-    // (e.g. testnet/regtest), matching the other block-creating RPCs here.
-    std::unique_ptr<BlockTemplate> block_template(miner.createNewBlock({ .coinbase_output_script = coinbase_output_script, .include_dummy_extranonce = true }));
-    if (!block_template) {
-        throw JSONRPCError(RPC_OUT_OF_MEMORY, "Could not create new block template");
+    // Held across template creation (which takes cs_main; nothing takes
+    // g_auxblock_mutex under cs_main), so concurrent pollers share one
+    // template instead of each building their own.
+    LOCK(g_auxblock_mutex);
+    const uint256 tip = WITH_LOCK(::cs_main, return chainman.ActiveTip()->GetBlockHash());
+    PruneStaleAuxBlockTemplates(tip);
+
+    std::shared_ptr<CBlock> block;
+    if (const auto cur = g_auxblock_current.find(coinbase_output_script); cur != g_auxblock_current.end()) {
+        const bool stale{mempool.GetTransactionsUpdated() != cur->second.tx_updated &&
+                         GetTime() - cur->second.created > AUXBLOCK_REFRESH_SECONDS};
+        if (!stale) block = g_auxblock_templates.at(cur->second.hash);
     }
-    auto block = std::make_shared<CBlock>(block_template->getBlock());
-    // The template comes back with hashMerkleRoot unset (upstream fills it in
-    // only at submitSolution time), so it must be computed here, before the
-    // hash below commits to the header.
-    block->hashMerkleRoot = BlockMerkleRoot(*block);
-    // Set VERSION_AUXPOW_BIT before computing the hash handed out below: this
-    // hash is what the parent pool commits to in its merge-mining tag, and
-    // it must exactly match the hash CheckAuxPow recomputes at submission
-    // time from the final (auxpow-bit-set) header — GetHash() covers
-    // nVersion (a genuine pure-header field), so setting the bit later, in
-    // submitauxblock, would silently change the hash out from under an
-    // already-committed proof and make every submission fail.
-    block->nVersion |= VERSION_AUXPOW_BIT;
+
+    if (!block) {
+        const unsigned int tx_updated{mempool.GetTransactionsUpdated()};
+
+        // include_dummy_extranonce: at height <=16, CScript() << nHeight alone
+        // (BIP34) serializes to a single-byte OP_N push, one byte short of the
+        // consensus-required 2-byte-minimum coinbase scriptSig ("bad-cb-length")
+        // -- see node/miner.cpp. Dormant on the live chain (already well past
+        // height 16) but needed for correctness on any fresh low-height chain
+        // (e.g. testnet/regtest), matching the other block-creating RPCs here.
+        std::unique_ptr<BlockTemplate> block_template(miner.createNewBlock({ .coinbase_output_script = coinbase_output_script, .include_dummy_extranonce = true }));
+        if (!block_template) {
+            throw JSONRPCError(RPC_OUT_OF_MEMORY, "Could not create new block template");
+        }
+        block = std::make_shared<CBlock>(block_template->getBlock());
+        // The template comes back with hashMerkleRoot unset (upstream fills it in
+        // only at submitSolution time), so it must be computed here, before the
+        // hash below commits to the header.
+        block->hashMerkleRoot = BlockMerkleRoot(*block);
+        // Set VERSION_AUXPOW_BIT before computing the hash handed out below: this
+        // hash is what the parent pool commits to in its merge-mining tag, and
+        // it must exactly match the hash CheckAuxPow recomputes at submission
+        // time from the final (auxpow-bit-set) header — GetHash() covers
+        // nVersion (a genuine pure-header field), so setting the bit later, in
+        // submitauxblock, would silently change the hash out from under an
+        // already-committed proof and make every submission fail.
+        block->nVersion |= VERSION_AUXPOW_BIT;
+
+        // The tip may have moved while the template was built.
+        PruneStaleAuxBlockTemplates(block->hashPrevBlock);
+        const uint256 hash = block->GetHash();
+        g_auxblock_templates[hash] = block;
+        g_auxblock_current[coinbase_output_script] = {hash, tx_updated, GetTime()};
+    }
     const uint256 hash = block->GetHash();
 
     int height;
     {
         LOCK(cs_main);
-        height = chainman.ActiveHeight() + 1;
-    }
-
-    {
-        LOCK(g_auxblock_mutex);
-        PruneStaleAuxBlockTemplates(block->hashPrevBlock);
-        g_auxblock_templates[hash] = block;
+        height = chainman.m_blockman.LookupBlockIndex(block->hashPrevBlock)->nHeight + 1;
     }
 
     const arith_uint256 target = arith_uint256().SetCompact(block->nBits);
@@ -1325,10 +1357,9 @@ static RPCHelpMan submitauxblock()
     bool accepted = chainman.ProcessNewBlock(block, /*force_processing=*/true, /*min_pow_checked=*/true, /*new_block=*/&new_block);
     CHECK_NONFATAL(chainman.m_options.signals)->UnregisterSharedValidationInterface(sc);
 
-    {
-        LOCK(g_auxblock_mutex);
-        g_auxblock_templates.erase(hash);
-    }
+    // The template is kept, as in Namecoin, until the tip changes: other
+    // pollers may have been handed the same hash, and a rejected proof can be
+    // corrected and resubmitted.
 
     if (!new_block && accepted) {
         return true; // duplicate of an already-accepted block

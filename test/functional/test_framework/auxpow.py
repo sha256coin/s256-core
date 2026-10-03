@@ -4,8 +4,6 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Helpers for merge-mining (AuxPoW) S256 blocks in functional tests."""
 
-import time
-
 from .messages import (
     COutPoint,
     CBlockHeader,
@@ -14,7 +12,9 @@ from .messages import (
     CTxOut,
     hash256,
     ser_compact_size,
+    sha256,
 )
+from .segwit_addr import encode_segwit_address
 from .script import (
     CScript,
     OP_TRUE,
@@ -93,17 +93,19 @@ def merge_mine(node, address, *, own_hash_above_target=False):
     """Merge-mine one block on top of node's tip via createauxblock and
     submitauxblock, returning its hash.
 
-    With own_hash_above_target, retry with a later mocked time until the aux
-    block's own hash does not meet its target, so that only the auxpow can
-    satisfy the proof of work (the normal case on a real network)."""
-    mocktime = int(time.time())
+    With own_hash_above_target, retry until the aux block's own hash does not
+    meet its target, so that only the auxpow can satisfy the proof of work
+    (the normal case on a real network). createauxblock reuses its template
+    per payout address, so retries pay to throwaway P2WSH addresses instead
+    of `address`."""
+    hrp = address.split("1")[0]
+    attempt = 0
     while True:
-        aux = node.createauxblock(address)
+        payout = address if attempt == 0 else encode_segwit_address(hrp, 0, sha256(f"auxpow retry {attempt}".encode()))
+        aux = node.createauxblock(payout)
         if not own_hash_above_target or int(aux["hash"], 16) > target_from_bits(int(aux["bits"], 16)):
             break
-        mocktime += 1
-        node.setmocktime(mocktime)
+        attempt += 1
     assert node.submitauxblock(aux["hash"], create_auxpow(aux["hash"], aux["bits"]))
-    node.setmocktime(0)
     assert node.getbestblockhash() == aux["hash"]
     return aux["hash"]

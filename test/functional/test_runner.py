@@ -293,6 +293,7 @@ BASE_SCRIPTS = [
     'feature_auxpow_segwit.py',
     'feature_auxpow_headers.py',
     'feature_auxpow_commitment.py',
+    'rpc_createauxblock.py',
     'mining_basic.py',
     'mining_mainnet.py',
     'feature_signet.py',
