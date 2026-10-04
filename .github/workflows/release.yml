@@ -36,9 +36,8 @@ env:
   # Suites/cases excluded from the release test gate -- see
   # test/S256_TEST_PORTING.md for why each one is here.
   # Update this list as debt is fixed or new debt is found; it should
-  # shrink over time, not grow.
-  TEST_EXCLUDES: >-
-    --run_test=!miner_tests/CreateNewBlock_validity
+  # shrink over time, not grow. Currently empty: the full unit suite runs.
+  TEST_EXCLUDES: ""
 
 jobs:
   build:

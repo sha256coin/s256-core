@@ -28,7 +28,8 @@ After step 1 (subsidy tests + `MAX_MONEY`): **39 failures**, all in the 9 suites
 After step 3: those 9 suites pass.
 
 rc1 (2026-10-03): the former exclude list is ported or fixed; only
-`miner_tests/CreateNewBlock_validity` is still excluded (see below).
+`miner_tests/CreateNewBlock_validity` was still excluded.
+v3.0.0 (2026-10-04): `miner_tests` ported too. No unit tests are excluded.
 
 | Suite / case | Status | Notes |
 |---|---|---|
@@ -38,7 +39,7 @@ rc1 (2026-10-03): the former exclude list is ported or fixed; only
 | `txvalidationcache_tests/checkinputs_test` | Ported | `-testactivationheight=dersig@202` (fixture chain is 200 blocks) |
 | `validation_chainstate_tests/chainstate_update_tip` | Passing | Needs the S256 regtest assumeutxo entry at 210 |
 | `validation_chainstatemanager_tests` | Ported | Heights +100 (snapshot at 210, snapshot chain 310/320), coin count `COINBASE_MATURITY` |
-| `miner_tests/CreateNewBlock_validity` | **Excluded for rc1** | Hard-coded Bitcoin nonces fail (`high-hash`) and 110 blocks are too few at maturity 200 (inputs from blocks 1-4 are spent at 111). Needs 210 blocks with new nonces (mainnet difficulty 1, ~4-6 min each); being regenerated after rc1, then committed with the table in one commit. No node change. |
+| `miner_tests/CreateNewBlock_validity` | Ported (v3.0.0) | Bitcoin's 110 hard-coded nonces fail (`high-hash`), and 110 blocks are too few at maturity 200 (inputs from blocks 1-4 are spent at 111). Now 210 blocks with nonces ground for S256 mainnet difficulty 1 (extranonce bumped where no nonce existed). No node change. |
 
 | Suite / case | Status | Notes |
 |---|---|---|
