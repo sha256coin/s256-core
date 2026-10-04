@@ -1,7 +1,7 @@
-SHA256Coin Core 3.0.0rc1 Release Notes
-======================================
+SHA256Coin Core 3.0.0 Release Notes
+===================================
 
-SHA256Coin Core 3.0.0 is a **mandatory upgrade**, and this is its first release candidate. Every mainnet node and every merge-mining setup must run 3.0.0 **before mainnet block 17,500**.
+SHA256Coin Core 3.0.0 is a **mandatory upgrade**. Every mainnet node and every merge-mining setup must run 3.0.0 **before mainnet block 17,500**.
 
 3.0.0 is based on Bitcoin Core 31.1, the same base as 2.2.0. These notes list what changed since SHA256Coin Core 2.2.0.
 
@@ -15,6 +15,20 @@ What to do:
 - **Node operators:** install 3.0.0 before block 17,500. No reindex is needed. Mainnet data directories, wallets and configuration files carry over unchanged.
 - **Pool and merge-mining operators:** update your merge-mining proxy as described in "Pool integration notes" below. Change the proxy at the same time as the node it talks to, never before.
 - **Testnet3 operators:** testnet3 is being restarted (see "Testnet3 reset").
+
+Testing
+-------
+
+Merged mining in 3.0.0 was verified on regtest, by the functional test suite, and on a reset testnet3 with two 3.0.0 nodes and a reference merge-mining proxy script. The testnet3 run covered:
+
+- merge-mined blocks containing SegWit transactions;
+- merged-mining trees with several chains;
+- rejection of the old tag byte order;
+- a second node syncing from scratch;
+- restarts while holding merge-mined blocks;
+- `getblocktemplate` blocks mixed in.
+
+Real pool software has not been tested against 3.0.0 yet. Pool operators should check their setup on testnet3 before mainnet block 17,500 (see "Pool integration notes").
 
 Consensus changes
 -----------------
@@ -126,6 +140,14 @@ Testnet4 no longer carries Bitcoin testnet4's minimum chain work, assumevalid bl
 
   The previous default was Bitcoin's signet: its challenge, seeds and chain data.
 - Custom signets (`-signet -signetchallenge=<script>`) work. Before, no signet node could start, because its genesis block was invalid. The signet genesis block is now valid and checked at startup, like every other network's.
+
+Changes since 3.0.0rc1
+----------------------
+
+- `-version` and `-help` print the shipped program names: `sha256coind`, `sha256coin-wallet`, `sha256coin-tx` and `sha256coin-util` instead of `bitcoind`, `bitcoin-wallet`, `bitcoin-tx` and `bitcoin-util`.
+- The unit test suite runs in full in the release builds, with no exclusions.
+- `SECURITY.md` describes how to report vulnerabilities: GitHub private vulnerability reporting, or security@sha256coin.eu.
+- No consensus, P2P or RPC changes.
 
 Notes for the next release
 --------------------------

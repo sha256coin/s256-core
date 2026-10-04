@@ -12,7 +12,7 @@ Based on Bitcoin Core v31.1, S256 doubles key parameters for increased scarcity 
 
 ## What's New in v3.0.0
 
-**Mandatory upgrade before mainnet block 17,500**, where merged mining starts. Release candidate: v3.0.0rc1.
+**Mandatory upgrade before mainnet block 17,500**, where merged mining starts.
 
 - **Merged-mining consensus fixes** — the auxpow must now prove the merge-mining tag is in the parent block's coinbase, and the hash in the tag uses the same byte order as Namecoin and Dogecoin. Nodes older than 3.0.0 will split off at the first merge-mined block. **Merge-mining proxies must be updated:** see [POOL_PROXY_NOTE.md](POOL_PROXY_NOTE.md).
 - **Crash fixes** — nodes holding merge-mined blocks could crash serving their headers to syncing peers, and could fail to restart.
