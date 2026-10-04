@@ -145,6 +145,12 @@ Changes since 3.0.0rc1
 ----------------------
 
 - `-version` and `-help` print the shipped program names: `sha256coind`, `sha256coin-wallet`, `sha256coin-tx` and `sha256coin-util` instead of `bitcoind`, `bitcoin-wallet`, `bitcoin-tx` and `bitcoin-util`.
+- User-visible text no longer refers to Bitcoin:
+  - `-version` and the GUI's About dialog point to the SHA256Coin source code;
+  - crash and error messages point to the SHA256Coin issue tracker;
+  - RPC help says "SHA256Coin address";
+  - wallet tool messages and the Windows file properties use SHA256Coin names.
+- **RPC error text changed:** an invalid address now returns `Invalid SHA256Coin address` (was `Invalid Bitcoin address`). The error code (-5) is unchanged. Update scripts that match the message text.
 - The unit test suite runs in full in the release builds, with no exclusions.
 - `SECURITY.md` describes how to report vulnerabilities: GitHub private vulnerability reporting, or security@sha256coin.eu.
 - No consensus, P2P or RPC changes.
