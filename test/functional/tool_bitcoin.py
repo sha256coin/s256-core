@@ -63,10 +63,11 @@ class ToolBitcoinTest(BitcoinTestFramework):
         node = self.nodes[0]
 
         self.log.info("Ensure bitcoin node command invokes bitcoind by default")
-        self.test_args([], [], expect_exe="bitcoind")
+        # S256: bitcoind prints its shipped name, sha256coind, in -version.
+        self.test_args([], [], expect_exe="sha256coind")
 
         self.log.info("Ensure bitcoin -M invokes bitcoind")
-        self.test_args(["-M"], [], expect_exe="bitcoind")
+        self.test_args(["-M"], [], expect_exe="sha256coind")
 
         self.log.info("Ensure bitcoin -M does not accept -ipcbind")
         self.test_args(["-M"], ["-ipcbind=unix"], expect_error='Error: Error parsing command line arguments: Invalid parameter -ipcbind=unix')
