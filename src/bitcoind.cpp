@@ -31,6 +31,7 @@
 #include <any>
 #include <functional>
 #include <optional>
+#include <string_view>
 
 using node::NodeContext;
 
@@ -138,8 +139,9 @@ static bool ProcessInitCommands(interfaces::Init& init, ArgsManager& args)
     if (HelpRequested(args) || args.GetBoolArg("-version", false)) {
         std::string strUsage = CLIENT_NAME " daemon version " + FormatFullVersion();
         if (const char* exe_name{init.exeName()}) {
+            // S256: EXE_NAME stays "bitcoind" (the IPC code uses it); print the shipped binary name.
             strUsage += " ";
-            strUsage += exe_name;
+            strUsage += std::string_view{exe_name} == "bitcoind" ? "sha256coind" : exe_name;
         }
         strUsage += "\n";
 
