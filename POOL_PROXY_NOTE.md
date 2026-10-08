@@ -1,10 +1,28 @@
-# Merge-mining proxy changes in SHA256Coin Core 3.0.0
+# Merge-mining proxy changes in SHA256Coin Core 3.0.0 and 3.0.1
 
 **Who needs this:** anyone who merge-mines SHA256Coin (S256), meaning a pool or merge-mining proxy that calls `createauxblock` / `submitauxblock`, and the operators of the S256 nodes those proxies talk to. On mainnet, solo miners and pools that mine S256 directly with `getblocktemplate` don't need to change anything. On the reset testnet3, BIP34 and SegWit are active from block 1. Blocks built from `getblocktemplate` there must put the block height in the coinbase scriptSig (BIP34) and include the witness commitment (the template's `default_witness_commitment`) from block 1.
 
-**Summary:** SHA256Coin Core 3.0.0 is mandatory before mainnet block 17,500, where merged mining (AuxPoW) starts. It changes two things a merge-mining proxy must match: the byte order of the hash in the coinbase tag, and the coinbase merkle index. Blocks built the old way are rejected by 3.0.0 nodes, and blocks built the new way are rejected by older nodes.
+**Summary:** SHA256Coin Core 3.0.1 is mandatory before mainnet block 17,500, where merged mining (AuxPoW) starts. If you already upgraded to 3.0.0, you must upgrade again to 3.0.1 before block 17,500. Compared with S256 builds before 3.0.0, a merge-mining proxy must match:
 
-## 1. Byte order of the hash in the coinbase tag (the main change)
+- the byte order of the hash in the coinbase tag (3.0.0);
+- the coinbase merkle index (3.0.0);
+- Namecoin's auxpow format, with the 32-byte `hashBlock` field (3.0.1);
+- chain ID 598 (3.0.1).
+
+Pool software that follows Namecoin's format matches all four without S256-specific changes.
+
+## 0. Namecoin's auxpow format (3.0.1)
+
+The serialized auxpow passed to `submitauxblock`, or carried in a block passed to `submitblock`, is Namecoin's, byte for byte:
+
+```
+parent coinbase tx | hashBlock (32 bytes) | coinbase merkle branch | coinbase index (int32, must be 0)
+  | chain merkle branch | chain index (int32) | parent block header (80 bytes)
+```
+
+`hashBlock` is not used: any value is accepted (pools often put the parent block hash there), and nodes store and relay it as zero. 3.0.0 left this field out, so Namecoin-style auxpows failed with `Block decode failed` (`submitblock`) or `auxpow decode failed` (`submitauxblock`). A proxy that was adapted to 3.0.0's format must add the field back. 3.0.1's `submitauxblock` rejects an auxpow followed by extra bytes with `auxpow decode failed: leftover bytes after the auxpow`.
+
+## 1. Byte order of the hash in the coinbase tag (3.0.0)
 
 Put the `hash` returned by `createauxblock` into the merge-mining tag **as the hex string decodes, with no byte reversal**. Namecoin and Dogecoin do it the same way. S256 builds before 3.0.0 expected the hash reversed.
 
@@ -27,26 +45,27 @@ S256 now works like Namecoin and Dogecoin:
 
 - Build the standard merged-mining tree and put its root in the tag the same way you do for those chains.
 - S256's slot in the tree comes from the standard expected-index formula, using the tree's merkle nonce and S256's chain ID: `598` (`0x0256`), since 3.0.1. 3.0.0 used `1395799350` (`0x53323536`): update it in your proxy configuration. `createauxblock` returns it as `chainid`.
+- S256 does not encode the chain ID in the block version; pools must take it from `createauxblock`'s `chainid` or configure 598.
 - If your proxy reverses the hash for S256 only, remove that special case. Treat S256 exactly like Namecoin.
 
-## 2. Coinbase merkle index must be 0
+## 2. Coinbase merkle index must be 0 (3.0.0)
 
 The auxpow sent to `submitauxblock` must prove the tag is in the parent block's **coinbase**, so its coinbase merkle branch index must be 0. A proxy that builds the branch for the coinbase already sends 0; anything else is rejected (`auxpow-coinbase-not-first`).
 
 ## Unchanged
 
-How `createauxblock` and `submitauxblock` are used, the auxpow serialization, and the tree size and nonce fields.
+How `createauxblock` and `submitauxblock` are called, and the tree size and nonce fields.
 
 ## Timing
 
-Switch the proxy **at the same time as the node upgrade**. Don't switch it until the S256 node it talks to runs 3.0.0: an old node rejects every block built the new way.
+Switch the proxy **at the same time as the node upgrade**. Don't switch it until the S256 node it talks to runs 3.0.1: an older node rejects or cannot decode every block built the new way.
 
-- **Mainnet:** the first merge-mined block is at 17,500, so use the new order from the start. Upgrade the node to 3.0.0 before 17,500.
-- **Testnet3:** the testnet3 chain is being restarted for 3.0.0. Switch when you restart on the reset chain: upgrade, delete `testnet3/blocks/`, `testnet3/chainstate/`, `testnet3/indexes/` and `testnet3/mempool.dat` (wallets can be kept), and start the node.
+- **Mainnet:** the first merge-mined block is at 17,500, so use the 3.0.1 format from the start. Upgrade the node to 3.0.1 before 17,500.
+- **Testnet3:** the testnet3 chain is being restarted for 3.0.1. Switch when you restart on the reset chain: upgrade, delete `testnet3/blocks/`, `testnet3/chainstate/`, `testnet3/indexes/` and `testnet3/mempool.dat` (wallets can be kept), and start the node.
 
 ## How to check
 
-On testnet or regtest, `submitauxblock` should return `true`. If it returns `false` and the node's `debug.log` shows `auxpow-chain-merkle-mismatch`, the hash bytes in the tag are in the wrong order.
+On testnet or regtest, `submitauxblock` should return `true`. If it fails with `auxpow decode failed`, the auxpow is not in Namecoin's format (check the `hashBlock` field). If it returns `false` and the node's `debug.log` shows `auxpow-chain-merkle-mismatch`, the hash bytes in the tag are in the wrong order.
 
 Other rejection reasons in `debug.log`:
 
@@ -76,6 +95,6 @@ Other rejection reasons in `debug.log`:
 | `bits`, `target`, `_target` | Target of the next S256 block (compact, big-endian, little-endian) |
 | `height` | Height of the next S256 block |
 
-`submitauxblock <hash> <auxpow>` takes the `hash` from `createauxblock` and the serialized auxpow: the parent coinbase, its merkle branch (index 0), the merged-mining tree branch with S256's index, and the parent block header. It returns `true` if the block was accepted.
+`submitauxblock <hash> <auxpow>` takes the `hash` from `createauxblock` and the serialized auxpow in Namecoin's format: the parent coinbase, `hashBlock`, its merkle branch (index 0), the merged-mining tree branch with S256's index, and the parent block header. It returns `true` if the block was accepted.
 
 Full release notes: [doc/release-notes.md](doc/release-notes.md).
