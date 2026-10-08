@@ -748,6 +748,7 @@ class CAuxPow:
     def deserialize(self, f):
         self.coinbaseTx = CTransaction()
         self.coinbaseTx.deserialize(f)
+        deser_uint256(f)  # hashBlock: unused, any value (Namecoin format)
         self.vMerkleBranch = deser_uint256_vector(f)
         self.nIndex = int.from_bytes(f.read(4), "little", signed=True)
         self.vChainMerkleBranch = deser_uint256_vector(f)
@@ -757,6 +758,7 @@ class CAuxPow:
 
     def serialize(self):
         return (self.coinbaseTx.serialize_with_witness()
+                + ser_uint256(0)  # hashBlock
                 + ser_uint256_vector(self.vMerkleBranch) + self.nIndex.to_bytes(4, "little", signed=True)
                 + ser_uint256_vector(self.vChainMerkleBranch) + self.nChainIndex.to_bytes(4, "little", signed=True)
                 + self.parentBlock._serialize_header())

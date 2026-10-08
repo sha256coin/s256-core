@@ -293,6 +293,7 @@ BASE_SCRIPTS = [
     'feature_auxpow_segwit.py',
     'feature_auxpow_headers.py',
     'feature_auxpow_commitment.py',
+    'feature_auxpow_namecoin.py',
     'rpc_createauxblock.py',
     'p2p_auxpow_headers.py',
     'feature_ibd_tip_age.py',

@@ -48,3 +48,7 @@ The `getblocktemplate` RPC code needs to be patched to ignore not being connecte
 to any peers, and to ignore the IBD status check.
 
 On macOS use `faketime "@$t"` instead.
+
+## namecoin/
+
+Namecoin's auxpow test helpers, unmodified; see `namecoin/README.md`.

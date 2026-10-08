@@ -98,7 +98,15 @@ public:
         // header-only paths, disk header reads, etc.) — TX_WITH_WITNESS(...)
         // supplies its own nested ParamsStream locally, so no ambient stream
         // needs to support it.
+        //
+        // hashBlock is the old CMerkleTx field that Namecoin's format keeps
+        // after the coinbase (and pools fill in, often with the parent block
+        // hash). It is never used: written as zero, and any value is
+        // accepted on read, exactly as in Namecoin, so that a Namecoin-style
+        // auxpow decodes byte for byte.
+        uint256 hashBlock;
         READWRITE(TX_WITH_WITNESS(obj.coinbaseTx));
+        READWRITE(hashBlock);
         READWRITE(obj.vMerkleBranch);
         READWRITE(obj.nIndex);
         READWRITE(obj.vChainMerkleBranch);

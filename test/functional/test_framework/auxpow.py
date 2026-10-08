@@ -64,10 +64,12 @@ def parent_tx(script_sig, prevout=None):
     return tx
 
 
-def serialize_auxpow(tagged_tx, merkle_branch, index, chain_branch, chain_index, merkle_root, bits_hex):
-    """Serialize an auxpow, grinding a parent header with the given
-    transaction merkle root to meet bits_hex. Branches are lists of 32-byte
-    internal-order hashes."""
+def serialize_auxpow(tagged_tx, merkle_branch, index, chain_branch, chain_index, merkle_root, bits_hex,
+                     hash_block=bytes(32)):
+    """Serialize an auxpow in the Namecoin format, grinding a parent header
+    with the given transaction merkle root to meet bits_hex. Branches are
+    lists of 32-byte internal-order hashes. hash_block is the unused
+    CMerkleTx field after the coinbase."""
     parent = CBlockHeader()
     parent.hashMerkleRoot = int.from_bytes(merkle_root, "little")
     parent.nBits = int(bits_hex, 16)
@@ -75,7 +77,7 @@ def serialize_auxpow(tagged_tx, merkle_branch, index, chain_branch, chain_index,
     while parent.hash_int > target:
         parent.nNonce += 1
 
-    return (tagged_tx.serialize()
+    return (tagged_tx.serialize() + hash_block
             + ser_compact_size(len(merkle_branch)) + b"".join(merkle_branch) + index.to_bytes(4, "little", signed=True)
             + ser_compact_size(len(chain_branch)) + b"".join(chain_branch) + chain_index.to_bytes(4, "little", signed=True)
             + parent.serialize()).hex()

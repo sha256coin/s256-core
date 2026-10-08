@@ -520,6 +520,64 @@ BOOST_AUTO_TEST_CASE(auxpow_header_hash_independent_of_auxpow)
     BOOST_CHECK(roundTripped.auxpow != nullptr);
 }
 
+BOOST_AUTO_TEST_CASE(auxpow_namecoin_wire_format)
+{
+    // The layout is Namecoin's: coinbase, hashBlock (32 bytes, written as
+    // zero), merkle branch, nIndex, chain merkle branch, nChainIndex, parent
+    // header.
+    auto block = AuxBlockCandidate(9);
+    const auto& params = Params().GetConsensus();
+    const CAuxPow auxpow = BuildValidAuxPow(block->GetHash(), block->nBits);
+
+    DataStream coinbase;
+    coinbase << TX_WITH_WITNESS(*auxpow.coinbaseTx);
+    DataStream ser;
+    ser << auxpow;
+    BOOST_REQUIRE_EQUAL(ser.size(), coinbase.size() + 32 + 1 + 4 + 1 + 4 + 80);
+    std::vector<std::byte> bytes{ser.begin(), ser.end()};
+    const size_t hb{coinbase.size()};
+    BOOST_CHECK(std::all_of(bytes.begin() + hb, bytes.begin() + hb + 32, [](std::byte b) { return b == std::byte{0}; }));
+
+    // Any hashBlock value is accepted, and the proof stays valid.
+    std::fill(bytes.begin() + hb, bytes.begin() + hb + 32, std::byte{0xab});
+    DataStream nonzero{bytes};
+    CAuxPow decoded;
+    nonzero >> decoded;
+    BOOST_CHECK(nonzero.empty());
+    BlockValidationState state;
+    BOOST_CHECK(decoded.CheckAuxPow(block->GetHash(), block->nBits, params.nAuxpowChainId, params, state));
+    DataStream reser;
+    reser << decoded;
+    BOOST_CHECK(std::equal(reser.begin(), reser.end(), ser.begin(), ser.end()));
+}
+
+BOOST_AUTO_TEST_CASE(auxpow_namecoin_helper_vector)
+{
+    // Output of Namecoin's test_framework/auxpow.py (master d52dff4d):
+    // finishAuxpow(*constructAuxpow("11" * 16 + "22" * 16)), parent header
+    // unmined. hashBlock is filled in with the parent block hash.
+    const auto raw{ParseHex(
+        "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff2cfabe6d6d"
+        "1111111111111111111111111111111122222222222222222222222222222222"
+        "0100000000000000ffffffff0000000000"
+        "b61b451885339c4ad04c9a42726ec37ded46c5afad4f71edc67ef4de24e97486"
+        "00000000000000000000"
+        "0100000000000000000000000000000000000000000000000000000000000000000000002"
+        "9fa92e908c97c3eb4e8d1c41cb0629db7f348f34dacd7cef4c8275aed81e111000000000000000000000000")};
+    BOOST_REQUIRE_EQUAL(raw.size(), 217U);
+    DataStream stream{raw};
+    CAuxPow auxpow;
+    stream >> auxpow;
+    BOOST_CHECK(stream.empty());
+    BOOST_CHECK_EQUAL(auxpow.coinbaseTx->GetHash().GetHex(), "11e181ed5a27c8f4ced7ac4df348f3b79d62b01cc4d1e8b43e7cc908e992fa29");
+    BOOST_CHECK_EQUAL(auxpow.parentBlock.hashMerkleRoot.GetHex(), auxpow.coinbaseTx->GetHash().GetHex());
+    BOOST_CHECK(auxpow.vMerkleBranch.empty());
+    BOOST_CHECK_EQUAL(auxpow.nIndex, 0);
+    BOOST_CHECK(auxpow.vChainMerkleBranch.empty());
+    BOOST_CHECK_EQUAL(auxpow.nChainIndex, 0);
+    BOOST_CHECK_EQUAL(auxpow.parentBlock.nVersion, 1);
+}
+
 BOOST_AUTO_TEST_CASE(auxpow_bit_without_auxpow_not_serializable)
 {
     // What CBlockIndex::GetPureHeader() gives for a merge-mined block: the

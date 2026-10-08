@@ -63,7 +63,7 @@ class AuxpowCommitmentTest(BitcoinTestFramework):
                 a = result["auxpow"]
                 assert raw.startswith(bytes.fromhex(a["tx"]["hex"]))
                 coinbase_len = len(bytes.fromhex(a["tx"]["hex"]))
-                rest = raw[coinbase_len:-80]
+                rest = raw[coinbase_len + 32:-80]  # after hashBlock
                 n = rest[0]
                 assert_equal(a["merklebranch"], [rest[1 + 32 * i:33 + 32 * i][::-1].hex() for i in range(n)])
                 rest = rest[1 + 32 * n + 4:]
