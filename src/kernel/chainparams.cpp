@@ -118,7 +118,7 @@ public:
         // (~16,808 at the time this was set) to give both existing pool
         // operators and holders lead time to upgrade before it activates.
         consensus.AuxpowStartHeight = 17500;
-        consensus.nAuxpowChainId = 0x53323536; // S256: arbitrary local merge-mining chain ID ("S256" in ASCII hex)
+        consensus.nAuxpowChainId = 0x0256; // S256: merge-mining chain ID 598 (16 bits, like Namecoin's 1 and Dogecoin's 98; 3.0.0 used 0x53323536)
         // S256: switch from the classic 1008-block-window DAA to per-block
         // LWMA (N=96) at the same height as AuxPoW above. The classic DAA
         // can leave the chain stuck at a too-high difficulty for up to a
@@ -259,7 +259,7 @@ public:
         consensus.SegwitHeight = 1;
         consensus.MinBIP9WarningHeight = 0;
         consensus.AuxpowStartHeight = 1; // S256: always active on testnet
-        consensus.nAuxpowChainId = 0x53323536;
+        consensus.nAuxpowChainId = 0x0256;
         consensus.LwmaStartHeight = 1; // S256: always active on testnet
         // S256: deliberately easier than mainnet's powLimit (which
         // compact-encodes to the same 0x1d00ffff difficulty-1 floor as
@@ -388,7 +388,7 @@ public:
         consensus.SegwitHeight = 1;
         consensus.MinBIP9WarningHeight = 0;
         consensus.AuxpowStartHeight = 1; // S256: always active on testnet4
-        consensus.nAuxpowChainId = 0x53323536;
+        consensus.nAuxpowChainId = 0x0256;
         consensus.LwmaStartHeight = 1; // S256: always active on testnet4
         consensus.powLimit = uint256{"00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
@@ -536,7 +536,7 @@ public:
         consensus.CSVHeight = 1;
         consensus.SegwitHeight = 1;
         consensus.AuxpowStartHeight = 1; // S256: always active on signet
-        consensus.nAuxpowChainId = 0x53323536;
+        consensus.nAuxpowChainId = 0x0256;
         consensus.LwmaStartHeight = 1; // S256: always active on signet
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         consensus.nPowTargetSpacing = 20 * 60;
@@ -618,7 +618,7 @@ public:
         consensus.CSVHeight = 1;    // Always active unless overridden
         consensus.SegwitHeight = 0; // Always active unless overridden
         consensus.AuxpowStartHeight = 0; // Always active unless overridden (see opts.activation_heights below)
-        consensus.nAuxpowChainId = 0x53323536;
+        consensus.nAuxpowChainId = 0x0256;
         consensus.LwmaStartHeight = 0; // Always active unless overridden (see opts.activation_heights below)
         consensus.MinBIP9WarningHeight = 0;
         consensus.powLimit = uint256{"7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};

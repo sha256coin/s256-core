@@ -64,7 +64,7 @@ old (rejected): fabe6d6d71605f4e3d2c1b0af9e8d7c6b5a4938271604f7d5b1e9c2a3f000000
 Merging SHA256Coin with other chains in one tag now works as for Namecoin and Dogecoin:
 
 - Build the standard merged-mining tree and put its root in the tag the same way you do for those chains.
-- SHA256Coin's slot in the tree comes from the standard expected-index formula, using the tree's merkle nonce and SHA256Coin's chain ID: `1395799350` (`0x53323536`). `createauxblock` returns it as `chainid`.
+- SHA256Coin's slot in the tree comes from the standard expected-index formula, using the tree's merkle nonce and SHA256Coin's chain ID: `598` (`0x0256`). `createauxblock` returns it as `chainid`.
 - If your proxy reverses the hash for SHA256Coin only, remove that special case. Treat SHA256Coin exactly like Namecoin.
 
 **2. Coinbase merkle index must be 0**

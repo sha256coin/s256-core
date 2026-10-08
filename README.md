@@ -192,7 +192,7 @@ Starting at block 17,500, S256 supports auxiliary proof-of-work (AuxPoW), the sa
 mechanism used by Namecoin, Dogecoin, and other coins. Any other SHA256 chain's pool can merge-mine
 S256 alongside its own block, at no extra cost to its miners' hashrate.
 
-- **Chain ID:** `0x53323536`
+- **Chain ID:** `598` (`0x0256`)
 - **RPC methods:** `createauxblock <address>` returns a new S256 block template to embed in the parent
   chain's coinbase; `submitauxblock <hash> <auxpow-hex>` submits the completed proof once the parent
   pool has mined a qualifying block.

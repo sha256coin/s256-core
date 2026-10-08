@@ -26,7 +26,7 @@ old (rejected): fabe6d6d71605f4e3d2c1b0af9e8d7c6b5a4938271604f7d5b1e9c2a3f000000
 S256 now works like Namecoin and Dogecoin:
 
 - Build the standard merged-mining tree and put its root in the tag the same way you do for those chains.
-- S256's slot in the tree comes from the standard expected-index formula, using the tree's merkle nonce and S256's chain ID: `1395799350` (`0x53323536`). `createauxblock` returns it as `chainid`.
+- S256's slot in the tree comes from the standard expected-index formula, using the tree's merkle nonce and S256's chain ID: `598` (`0x0256`), since 3.0.1. 3.0.0 used `1395799350` (`0x53323536`): update it in your proxy configuration. `createauxblock` returns it as `chainid`.
 - If your proxy reverses the hash for S256 only, remove that special case. Treat S256 exactly like Namecoin.
 
 ## 2. Coinbase merkle index must be 0
@@ -70,7 +70,7 @@ Other rejection reasons in `debug.log`:
 | Field | Meaning |
 |---|---|
 | `hash` | Hash of the new S256 block: put it in the tag as is (see above) |
-| `chainid` | S256's merge-mining chain ID, `1395799350` |
+| `chainid` | S256's merge-mining chain ID, `598` (`0x0256`) |
 | `previousblockhash` | The S256 tip the template builds on |
 | `coinbasevalue` | Block reward in satoshis |
 | `bits`, `target`, `_target` | Target of the next S256 block (compact, big-endian, little-endian) |

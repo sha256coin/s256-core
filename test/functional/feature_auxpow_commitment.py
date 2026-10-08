@@ -7,6 +7,9 @@
 - the tagged transaction must be the parent's coinbase (merkle index 0)
 - one parent commits to at most one S256 block: the chain merkle index must
   be the slot expected for S256's chain ID, and the tag may appear only once
+- S256's chain ID is 598 (0x0256): createauxblock returns it, and in a tree
+  of 64 leaves S256 must sit at its slot, not at the slot of 3.0.0's ID
+  0x53323536
 - the tag carries the createauxblock hash bytes in hex order (Namecoin's)
 - an accepted aux block relays to a peer, a rejected one does not
 - getblock / getblockheader show the auxpow
@@ -28,11 +31,20 @@ from test_framework.script import CScript
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
 
-S256_CHAIN_ID = 0x53323536
+S256_CHAIN_ID = 0x0256  # 598
+OLD_CHAIN_ID = 0x53323536  # 3.0.0
 
 
 def txid(tx):
     return hash256(tx.serialize_without_witness())
+
+
+def chain_root(leaf, branch, index):
+    """Root of a merge-mining tree from a leaf, its branch and its slot."""
+    for sibling in branch:
+        leaf = hash256(sibling + leaf) if index & 1 else hash256(leaf + sibling)
+        index >>= 1
+    return leaf
 
 
 class AuxpowCommitmentTest(BitcoinTestFramework):
@@ -140,6 +152,22 @@ class AuxpowCommitmentTest(BitcoinTestFramework):
         a, b, leaves, cb, root = two_blocks()
         self.assert_accepted(a, serialize_auxpow(cb, [], 0, [leaves[1 - slot]], slot, root, a["bits"]))
 
+        self.log.info("Chain ID 598: S256's slot in a tree of 2**6 leaves")
+        assert_equal(node.createauxblock(addr1)["chainid"], S256_CHAIN_ID)
+        height = 6  # 598 and 0x53323536 give the same slot below this height
+        nonce = next(n for n in range(100) if expected_index(n, S256_CHAIN_ID, height) != expected_index(n, OLD_CHAIN_ID, height))
+        branch = [hash256(bytes([i])) for i in range(height)]
+        for chain_id, accepted in ((OLD_CHAIN_ID, False), (S256_CHAIN_ID, True)):
+            aux = node.createauxblock(addr1)
+            slot = expected_index(nonce, chain_id, height)
+            root = chain_root(merkle_leaf(aux["hash"]), branch, slot)
+            cb = parent_tx(CScript([merge_mining_tag(root, 1 << height, nonce)]))
+            auxpow = serialize_auxpow(cb, [], 0, branch, slot, txid(cb), aux["bits"])
+            if accepted:
+                self.assert_accepted(aux, auxpow)
+            else:
+                self.assert_rejected(aux, auxpow, "auxpow-wrong-index")
+
         self.log.info("Reject a parent coinbase with two merge-mining tags")
         for submit_first in (True, False):
             a, b = node.createauxblock(addr1), node.createauxblock(addr2)
@@ -148,7 +176,7 @@ class AuxpowCommitmentTest(BitcoinTestFramework):
             self.assert_rejected(target, serialize_auxpow(cb, [], 0, [], 0, txid(cb), target["bits"]),
                                  "auxpow-multiple-merge-mining-tags")
 
-        assert_equal(node.getblockcount(), 23)
+        assert_equal(node.getblockcount(), 24)
         assert_equal(self.nodes[1].getbestblockhash(), node.getbestblockhash())
 
 
