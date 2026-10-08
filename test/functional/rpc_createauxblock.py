@@ -8,6 +8,7 @@
   changes, or until the mempool changed and the template is a minute old
 - a template stays submittable, also after a rejected submission, until a
   call after a tip change drops it
+- submitauxblock rejects an auxpow with leftover bytes
 - templates leave -auxpowreservedweight room for the auxpow
 """
 
@@ -72,7 +73,12 @@ class CreateAuxBlockTest(BitcoinTestFramework):
         self.log.info("Templates stay submittable until the tip changes, also after a rejected proof")
         bad = create_auxpow(other["hash"], first["bits"])  # commits to a different block
         assert_equal(node.submitauxblock(first["hash"], bad), False)
-        assert_equal(node.submitauxblock(first["hash"], create_auxpow(first["hash"], first["bits"])), True)
+        good = create_auxpow(first["hash"], first["bits"])
+        self.log.info("An auxpow with leftover bytes, or cut short, is not decoded")
+        assert_raises_rpc_error(-22, "auxpow decode failed: leftover bytes after the auxpow",
+                                node.submitauxblock, first["hash"], good + "00")
+        assert_raises_rpc_error(-22, "auxpow decode failed", node.submitauxblock, first["hash"], good[:-2])
+        assert_equal(node.submitauxblock(first["hash"], good), True)
         assert_equal(node.getbestblockhash(), first["hash"])
         # The next call sees the new tip and drops the old templates.
         new_tip = node.createauxblock(addr1)

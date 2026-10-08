@@ -1355,6 +1355,11 @@ static RPCHelpMan submitauxblock()
         } catch (const std::exception&) {
             throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "auxpow decode failed");
         }
+        // Leftover bytes mean the caller's format differs from ours; report
+        // that instead of validating a misparsed proof.
+        if (!ser_auxpow.empty()) {
+            throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "auxpow decode failed: leftover bytes after the auxpow");
+        }
     }
 
     // VERSION_AUXPOW_BIT is already set on this template — createauxblock
