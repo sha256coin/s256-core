@@ -97,6 +97,7 @@ Initial block download and template RPCs
 P2P and protocol
 ----------------
 
+- **Protocol version 70101 (3.0.1).** Marks the Namecoin auxpow format (see "Namecoin auxpow format"). 3.0.0 nodes (70100) still connect, but can't decode merge-mined blocks in the new format; there is no disconnect by height.
 - **Protocol version 70100.** Merge-mined headers carry the parent block's coinbase and merkle branches, so their size varies. From version 70100, `headers` messages are also limited by size. A reply stops at the header that reaches 2,000,000 bytes, and the receiving peer then asks for more. A header announcement that would exceed the limit falls back to an `inv`. Older peers are still served (oversized replies are cut for them too) and still connect.
 - **The minimum peer protocol version is unchanged in 3.0.0**, so 2.x nodes can still connect.
 - **Headers sync** keeps each header's auxpow through the low-work headers presync, and its memory parameters are retuned for merge-mined headers (about 1.6 MiB per syncing peer).
@@ -158,7 +159,7 @@ Changes since 3.0.0rc1
 Notes for the next release
 --------------------------
 
-- **The next release after block 17,500 will raise the minimum peer protocol version to 70100.** Nodes older than 3.0.0 will then no longer be able to connect. 3.0.0 keeps accepting them so the network can upgrade before the fork.
+- **The next release after block 17,500 will raise the minimum peer protocol version to 70101.** Nodes older than 3.0.1 will then no longer be able to connect. 3.0.1 keeps accepting them so the network can upgrade before the fork.
 
 Credits
 -------

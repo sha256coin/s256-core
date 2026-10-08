@@ -99,8 +99,9 @@ logger = logging.getLogger("TestFramework.p2p")
 MIN_P2P_VERSION_SUPPORTED = 60001
 # The P2P version that this test framework implements and sends in its `version` message
 # Version 70016 supports wtxid relay
-# S256: version 70100 limits "headers" messages by size (SIZE_HEADERS_LIMIT_VERSION)
-P2P_VERSION = 70100
+# S256: version 70100 limits "headers" messages by size (SIZE_HEADERS_LIMIT_VERSION),
+# version 70101 (3.0.1) uses Namecoin's auxpow format
+P2P_VERSION = 70101
 # The services that this test framework offers in its `version` message
 P2P_SERVICES = NODE_NETWORK | NODE_WITNESS
 # The P2P user agent string that this test framework sends in its `version` message

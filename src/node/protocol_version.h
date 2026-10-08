@@ -9,7 +9,9 @@
  * network protocol versioning
  */
 
-static const int PROTOCOL_VERSION = 70100;
+//! S256: 70101 (3.0.1) marks Namecoin's auxpow format (hashBlock after the
+//! parent coinbase). 70100 (3.0.0) nodes can't decode merge-mined blocks in it.
+static const int PROTOCOL_VERSION = 70101;
 
 //! initial proto version, to be increased after version/verack negotiation
 static const int INIT_PROTO_VERSION = 209;
