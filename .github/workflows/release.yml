@@ -119,17 +119,13 @@ jobs:
   # download alongside the plain tarball.
   macos:
     name: macOS build + tests (Apple Silicon)
-    runs-on: macos-14
+    # macos-14 is retired by GitHub (brownouts from 2026-10-05, gone by
+    # 2026-11-02). macos-15's default Xcode ships a new enough Clang
+    # (doc/dependencies.md requires 17.0+), so no xcode-select pin is
+    # needed, same as the Intel leg. Binaries need macOS 15+.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-
-      # doc/dependencies.md requires Clang 17.0+; macos-14's default Xcode
-      # (15.4) ships AppleClang 15.0, which is too old to compile this
-      # codebase -- confirmed on the BitcoinSilver fork's own macos-14 job.
-      # Xcode 16.2 is already present on this runner image, just not
-      # selected by default.
-      - name: Select Xcode 16.2 (need Clang 17+, default Xcode 15.4 is too old)
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app
 
       - name: Install dependencies
         run: brew install cmake boost pkgconf libevent qt@6 qrencode python zmq
@@ -189,11 +185,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # doc/dependencies.md requires Clang 17.0+. Left unpinned deliberately
-      # (unlike the arm64 leg above): macos-15-intel is a newer macOS/Xcode
-      # baseline and its default Xcode may already be new enough. If this
-      # fails on a Clang version error, add an explicit xcode-select step
-      # here the same way the arm64 job needed one.
+      # doc/dependencies.md requires Clang 17.0+; macos-15-intel's default
+      # Xcode is new enough (no xcode-select pin, same as the arm64 leg).
       - name: Install dependencies
         run: brew install cmake boost pkgconf libevent qt@6 qrencode python zmq
 
