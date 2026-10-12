@@ -203,6 +203,10 @@ S256 alongside its own block, at no extra cost to its miners' hashrate.
 requires the coinbase merkle index to be 0. See [POOL_PROXY_NOTE.md](POOL_PROXY_NOTE.md) for the exact
 tag layout, examples, timing and how to check.
 
+**Pools that tested merged mining with v3.0.1 on testnet3:**
+- https://sha256-mining.go.ro:50300/
+- https://pool.rodb2008.com/
+
 See `src/auxpow.h`/`src/auxpow.cpp` for the AuxPoW proof format and validation, and `src/rpc/mining.cpp`
 for the RPC implementation.
 
