@@ -251,6 +251,15 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # SHA256SUMS.txt lets users verify their download:
+      #   sha256sum -c --ignore-missing SHA256SUMS.txt
+      - name: Checksums
+        working-directory: dist
+        run: |
+          set -euo pipefail
+          sha256sum SHA256Coin-* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
