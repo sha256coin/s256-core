@@ -90,7 +90,12 @@ Testing
 
 - **Functional test suite.** A new test builds auxpows with Namecoin's own test helpers, included unmodified. Those auxpows are accepted by `submitauxblock` and `submitblock`. The same test fails against 3.0.0.
 - **Chain ID.** The tests check `createauxblock`'s `chainid`. They also check SHA256Coin's slot in a tree of 64 leaves.
-- **Real pool software.** Before 3.0.1 final, a pool operator's merge-mining pool (Namecoin-style, unchanged) is to be tested against 3.0.1rc1 on the reset testnet3.
+- **Real pool software.** On the reset testnet3, 256 merge-mined blocks were mined with the sha256-nomp pool against 3.0.1rc1, with help from RodB.
+
+Platforms
+---------
+
+- **macOS on Apple Silicon now needs macOS 15 or later** (3.0.0 needed 14). The release build moved to GitHub's macOS 15 runner because the macOS 14 runner is being retired. The Intel macOS build already needed macOS 15.
 
 Notes for the next release
 --------------------------
@@ -100,4 +105,4 @@ Notes for the next release
 Credits
 -------
 
-Thanks to RodB (@rodb2008), whose merge-mining tests with mkpool found the auxpow format difference, and to the Namecoin developers for the auxpow design and test helpers. Release notes for 3.0.0 are in `doc/release-notes/release-notes-sha256coin-3.0.0.md`; for Bitcoin Core 31.1, in `doc/release-notes/release-notes-31.1.md`.
+Thanks to RodB ([@rodb2008](https://github.com/rodb2008)), whose merge-mining tests with mkpool found the auxpow format difference and who helped with the testnet3 merged-mining test, and to the Namecoin developers for the auxpow design and test helpers. Release notes for 3.0.0 are in `doc/release-notes/release-notes-sha256coin-3.0.0.md`; for Bitcoin Core 31.1, in `doc/release-notes/release-notes-31.1.md`.
