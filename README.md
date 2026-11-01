@@ -1,6 +1,12 @@
 S256 Core - Digital Platinum
 ============================
 
+[![Release](https://img.shields.io/github/v/release/sha256coin/s256-core?label=release&color=f5a623)](https://github.com/sha256coin/s256-core/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/sha256coin/s256-core/total?color=2ea043)](https://github.com/sha256coin/s256-core/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](COPYING)
+[![Based on Bitcoin Core](https://img.shields.io/badge/based%20on-Bitcoin%20Core%2031.1-f7931a)](https://github.com/bitcoin/bitcoin)
+[![Last commit](https://img.shields.io/github/last-commit/sha256coin/s256-core)](https://github.com/sha256coin/s256-core/commits/main)
+
 **Website:** https://sha256coin.eu/
 **Block Explorer:** https://explorer.sha256coin.eu/
 
@@ -9,6 +15,16 @@ S256 Core - Digital Platinum
 S256 is a Bitcoin fork that takes the contrarian approach: **"Double the Work, Double the Value"**
 
 Based on Bitcoin Core v31.1, S256 doubles key parameters for increased scarcity and deliberation:
+
+## What's New in v3.0.1
+
+**Mandatory upgrade before mainnet block 17,500**, also for nodes already on v3.0.0. No reindex is needed.
+
+- **Namecoin's auxpow format, byte for byte** — v3.0.0 left out the 32-byte `hashBlock` field, so pool software written for Namecoin-style merged mining could not submit blocks to it. The field is now there (any value is accepted). A v3.0.0 node cannot decode merge-mined blocks in the v3.0.1 format and will split off at the first one.
+- **Merge-mining chain ID 598 (`0x0256`)** on all networks, a 16-bit ID like Namecoin's and Dogecoin's. It was `1395799350` in v3.0.0. Proxies that have the old ID configured must change it, or take it from `createauxblock`'s `chainid`.
+- **Testnet3 restarted again.**
+
+Full details: [doc/release-notes.md](doc/release-notes.md). Pool and proxy operators: [POOL_PROXY_NOTE.md](POOL_PROXY_NOTE.md).
 
 ## What's New in v3.0.0
 
@@ -226,7 +242,8 @@ difficulty adjustment responds when miners come and go. See the full report with
 - **Block Explorer:** https://explorer.sha256coin.eu/
 - **GitHub:** https://github.com/sha256coin
 - **Discord:** https://discord.gg/dtn58HrC94
-- **Telegram:** https://t.me/+Ecf4ApES37NjZTBk
+- **Telegram:** https://t.me/s256coin
+- **Bitcointalk:** https://bitcointalk.org/index.php?topic=5567429.msg66131557#msg66131557
 
 ## Philosophy
 
