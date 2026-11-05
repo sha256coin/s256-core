@@ -14,7 +14,7 @@ S256 Core - Digital Platinum
 
 S256 is a Bitcoin fork that takes the contrarian approach: **"Double the Work, Double the Value"**
 
-Based on Bitcoin Core v31.1, S256 doubles key parameters for increased scarcity and deliberation:
+Based on Bitcoin Core v31.1, S256 doubles key parameters for a slower, more deliberate chain:
 
 ## What's New in v3.0.1
 
@@ -155,23 +155,23 @@ cmake --build build-win -j$(nproc)
 
 ### Start the daemon:
 ```bash
-./build/bin/bitcoind -daemon
+./build/bin/sha256coind -daemon
 ```
 
 ### Check blockchain status:
 ```bash
-./build/bin/bitcoin-cli getblockchaininfo
+./build/bin/sha256coin-cli getblockchaininfo
 ```
 
 ### Stop the daemon:
 ```bash
-./build/bin/bitcoin-cli stop
+./build/bin/sha256coin-cli stop
 ```
 
 ### Data Directory
 
 **Linux:** `~/.sha256coin/`
-**Windows:** `%APPDATA%\SHA256Coin\`
+**Windows:** `%LOCALAPPDATA%\SHA256Coin\`
 **macOS:** `~/Library/Application Support/SHA256Coin/`
 
 ### Configuration
@@ -195,16 +195,15 @@ addnode=sha256coin.eu:25256
 
 S256 uses SHA256 Proof-of-Work, compatible with Bitcoin mining hardware (ASICs).
 
-**Solo Mining:**
-```bash
-./bitcoin-cli generatetoaddress 1 "your_s256_address"
-```
+**Solo Mining:** Run your own node and point mining software that supports `getblocktemplate` at it
+(or use a solo-mining pool). ASICs are needed at mainnet difficulty; the `generatetoaddress` RPC mines on
+the CPU and is only practical on regtest.
 
 **Pool Mining:** Contact pool operators or set up your own using sha256-nomp.
 
 ## AuxPoW / Merged Mining
 
-Starting at block 17,500, S256 supports auxiliary proof-of-work (AuxPoW), the same merged-mining
+Since block 17,500, S256 supports auxiliary proof-of-work (AuxPoW), the same merged-mining
 mechanism used by Namecoin, Dogecoin, and other coins. Any other SHA256 chain's pool can merge-mine
 S256 alongside its own block, at no extra cost to its miners' hashrate.
 
@@ -228,7 +227,7 @@ for the RPC implementation.
 
 ## Pre-Fork Validation
 
-Before block 17,500 activates on mainnet, the AuxPoW/LWMA transition was rehearsed end-to-end on an
+Before block 17,500 activated on mainnet, the AuxPoW/LWMA transition was rehearsed end-to-end on an
 isolated test chain — including a simulated hashrate drop and recovery, to check how LWMA's per-block
 difficulty adjustment responds when miners come and go. See the full report with charts:
 
@@ -256,7 +255,7 @@ S256 embraces difficulty rather than avoiding it:
 
 ## Security
 
-- **Exchange Deposits:** 500+ confirmations recommended
+- **Exchange Deposits:** 50+ confirmations recommended
 - **Consensus:** Pure Proof-of-Work
 - **Difficulty Adjustment:** Classic 1,008-block window (~14 days) below block 17,500; per-block LWMA (96-block window) from block 17,500 onward — see [What's New in v2.0.1](#whats-new-in-v201)
 
