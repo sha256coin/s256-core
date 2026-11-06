@@ -43,7 +43,9 @@ class CreateAuxBlockTest(BitcoinTestFramework):
         wallet = node.get_wallet_rpc("w")
         addr1 = wallet.getnewaddress()
         addr2 = wallet.getnewaddress()
-        self.generatetoaddress(node, COINBASE_MATURITY + 10, addr1)
+        # Enough mature coinbases for 40 separate sends below, so no send has
+        # to spend an unconfirmed change output (a chain the mempool rejects).
+        self.generatetoaddress(node, COINBASE_MATURITY + 60, addr1)
         now = int(time.time())
         node.setmocktime(now)
 
@@ -90,7 +92,7 @@ class CreateAuxBlockTest(BitcoinTestFramework):
 
         self.log.info("Templates leave room for the auxpow")
         node.setmocktime(0)
-        self.restart_node(0, [f"-blockmaxweight={MAX_WEIGHT}"])
+        self.restart_node(0, [f"-blockmaxweight={MAX_WEIGHT}", "-spendzeroconfchange=0"])
         node.loadwallet("w")
         wallet = node.get_wallet_rpc("w")
         for _ in range(40):
@@ -108,7 +110,7 @@ class CreateAuxBlockTest(BitcoinTestFramework):
         assert_greater_than(block["nTx"] - 1, 0)
 
         self.log.info("-auxpowreservedweight=0 builds the same template as getblocktemplate")
-        self.restart_node(0, [f"-blockmaxweight={MAX_WEIGHT}", "-auxpowreservedweight=0"])
+        self.restart_node(0, [f"-blockmaxweight={MAX_WEIGHT}", "-auxpowreservedweight=0", "-spendzeroconfchange=0"])
         node.loadwallet("w")
         wallet = node.get_wallet_rpc("w")
         for _ in range(40 - len(node.getrawmempool())):
