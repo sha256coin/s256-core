@@ -147,8 +147,14 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].threshold = 1815; // 90%
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].period = 2016;
 
-        consensus.nMinimumChainWork = uint256{"00000000000000000000000000000000000000000000000083808230823080e0"};  // Block ~11277
-        consensus.defaultAssumeValid = uint256{"0000000000000298bf2bc28591b687e9edf78dab2fd6873e972cd62935e05def"}; // Block 11277
+        // S256: all three are block 18,000 (500 past the AuxPoW/LWMA fork at 17,500) and must stay
+        // the same block: the checkpoint, defaultAssumeValid, and the block whose chainwork is
+        // nMinimumChainWork (chainparams_tests checks it).
+        consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000001b0c0a03d9c1e5cbeaa"};  // Block 18000
+        consensus.defaultAssumeValid = uint256{"d465034b116df75304b9aea548d0706110b13ed7c7abe87f746abb35e0726416"}; // Block 18000
+        m_checkpoints = {
+            {18000, uint256{"d465034b116df75304b9aea548d0706110b13ed7c7abe87f746abb35e0726416"}},
+        };
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -196,10 +202,10 @@ public:
         };
 
         chainTxData = ChainTxData{
-            // S256: Data as of block 11277 (December 2025)
-            .nTime    = 1764830319,
-            .tx_count = 11465,
-            .dTxRate  = 0.06683942453757484,
+            // S256: Data as of block 18000 (2026-11-04), from getchaintxstats 4032
+            .nTime    = 1793806741,
+            .tx_count = 21002,
+            .dTxRate  = 0.0002044820164755174,
         };
 
         // S256: this was missing entirely from CMainParams (present on
@@ -216,7 +222,8 @@ public:
         // Generated with contrib/devtools/headerssync-params.py using S256's
         // own parameters: BLOCK_INTERVAL=1200s (20-minute blocks),
         // MINCHAINWORK_HEADERS=11277 (the height behind nMinimumChainWork
-        // above), GENESIS_TIME=2025-11-30 (S256's genesis, which bounds the
+        // when these were generated; it is 18000 now, which moves the optimum
+        // by about 3%, so they were left as they are), GENESIS_TIME=2025-11-30 (S256's genesis, which bounds the
         // timewarp attack), and COMPACT_HEADER_SIZE=1500*8: a buffered
         // merge-mined header keeps its auxpow, measured at 1,424 bytes per
         // header (64-byte CompressedHeader + heap) for a typical pool's
@@ -650,6 +657,7 @@ public:
         pchMessageStart[2] = 0xb5;
         pchMessageStart[3] = 0xda;
         nDefaultPort = 18444;
+        m_checkpoints = opts.checkpoints;
         nPruneAfterHeight = opts.fastprune ? 100 : 1000;
         m_assumed_blockchain_size = 0;
         m_assumed_chain_state_size = 0;

@@ -18,6 +18,7 @@
 #include <cassert>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <vector>
 
@@ -45,6 +46,16 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
 {
     if (auto value = args.GetBoolArg("-fastprune")) options.fastprune = *value;
     if (HasTestOption(args, "bip94")) options.enforce_bip94 = true;
+
+    for (const std::string& arg : args.GetArgs("-testcheckpoint")) {
+        const auto found{arg.find(':')};
+        const auto height{found == std::string::npos ? std::nullopt : ToIntegral<int32_t>(arg.substr(0, found))};
+        const auto hash{found == std::string::npos ? std::nullopt : uint256::FromHex(arg.substr(found + 1))};
+        if (!height || *height < 1 || !hash) {
+            throw std::runtime_error(strprintf("Invalid format (%s) for -testcheckpoint=height:hash.", arg));
+        }
+        options.checkpoints[*height] = *hash;
+    }
 
     for (const std::string& arg : args.GetArgs("-testactivationheight")) {
         const auto found{arg.find('@')};
@@ -116,6 +127,11 @@ const CChainParams &Params() {
 
 std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, const ChainType chain)
 {
+    // S256: -testcheckpoint changes which chain a node accepts, so it must never be usable
+    // outside regtest. Refuse to start instead of ignoring it.
+    if (chain != ChainType::REGTEST && args.IsArgSet("-testcheckpoint")) {
+        throw std::runtime_error("-testcheckpoint is only available on regtest");
+    }
     switch (chain) {
     case ChainType::MAIN:
         return CChainParams::Main();

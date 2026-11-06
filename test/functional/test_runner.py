@@ -298,6 +298,7 @@ BASE_SCRIPTS = [
     'rpc_createauxblock.py',
     'rpc_createauxblock_idle.py',
     'rpc_createauxblock_ibd.py',
+    'feature_checkpoint.py',
     'rpc_gbt_auxpow_weight.py',
     'p2p_auxpow_headers.py',
     'p2p_min_protocol.py',

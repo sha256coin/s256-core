@@ -19,6 +19,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <map>
 #include <unordered_map>
 #include <vector>
 
@@ -88,6 +89,8 @@ public:
 
     const Consensus::Params& GetConsensus() const { return consensus; }
     const MessageStartChars& MessageStart() const { return pchMessageStart; }
+    /** S256: block hashes that headers must match at the given heights (a header at that height with another hash is rejected: "checkpoint-mismatch"). Mainnet only. */
+    const std::map<int, uint256>& Checkpoints() const { return m_checkpoints; }
     uint16_t GetDefaultPort() const { return nDefaultPort; }
     std::vector<int> GetAvailableSnapshotHeights() const;
 
@@ -152,6 +155,7 @@ public:
         std::unordered_map<Consensus::BuriedDeployment, int> activation_heights{};
         bool fastprune{false};
         bool enforce_bip94{false};
+        std::map<int, uint256> checkpoints{};
     };
 
     static std::unique_ptr<const CChainParams> RegTest(const RegTestOptions& options);
@@ -178,6 +182,7 @@ protected:
     bool fDefaultConsistencyChecks;
     bool m_is_mockable_chain;
     std::vector<AssumeutxoData> m_assumeutxo_data;
+    std::map<int, uint256> m_checkpoints;
     ChainTxData chainTxData;
     HeadersSyncParams m_headers_sync_params;
 };

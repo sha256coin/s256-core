@@ -4141,6 +4141,14 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     assert(pindexPrev != nullptr);
     const int nHeight = pindexPrev->nHeight + 1;
 
+    // S256: a header at a checkpoint height must be the checkpoint block. Any chain that forks
+    // before the checkpoint has another block there, so it is never followed.
+    if (const auto& checkpoints{chainman.GetParams().Checkpoints()}; !checkpoints.empty()) {
+        if (const auto it{checkpoints.find(nHeight)}; it != checkpoints.end() && it->second != block.GetHash()) {
+            return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "checkpoint-mismatch", strprintf("block at checkpoint height %d is not the checkpoint block", nHeight));
+        }
+    }
+
     // Check proof of work
     const Consensus::Params& consensusParams = chainman.GetConsensus();
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))

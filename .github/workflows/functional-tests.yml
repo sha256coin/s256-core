@@ -36,6 +36,7 @@ env:
     rpc_createauxblock_idle.py
     rpc_createauxblock_ibd.py
     rpc_gbt_auxpow_weight.py
+    feature_checkpoint.py
 
 jobs:
   auxpow:
