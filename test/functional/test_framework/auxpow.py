@@ -91,6 +91,15 @@ def create_auxpow(aux_hash_hex, bits_hex):
     return serialize_auxpow(coinbase, [], 0, [], 0, coinbase.txid_int.to_bytes(32, "little"), bits_hex)
 
 
+def create_large_auxpow(aux_hash_hex, bits_hex, payout_outputs):
+    """Like create_auxpow, but the parent coinbase pays `payout_outputs`
+    additional P2WPKH-sized outputs, as a pool that pays its miners in the
+    coinbase does (about 31 bytes each)."""
+    coinbase = parent_tx(CScript([merge_mining_tag(merkle_leaf(aux_hash_hex))]))
+    coinbase.vout += [CTxOut(1, bytes([0, 20]) + sha256(i.to_bytes(4, "little"))[:20]) for i in range(payout_outputs)]
+    return serialize_auxpow(coinbase, [], 0, [], 0, coinbase.txid_int.to_bytes(32, "little"), bits_hex)
+
+
 def merge_mine(node, address, *, own_hash_above_target=False):
     """Merge-mine one block on top of node's tip via createauxblock and
     submitauxblock, returning its hash.

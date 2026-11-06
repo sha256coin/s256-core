@@ -617,6 +617,18 @@ static std::string gbt_rule_value(const std::string& name, bool gbt_optional_rul
     return s;
 }
 
+//! Weight that block templates for merge-mined blocks leave free: the usual
+//! -blockreservedweight plus -auxpowreservedweight for the auxpow, which is
+//! attached after the template is built and counts towards the block weight.
+//! Used by createauxblock and getblocktemplate (a pool may build its S256
+//! block from either). Auxpow stays optional at every height; the reserve is
+//! only a safety margin, and -auxpowreservedweight=0 removes it.
+static size_t AuxpowTemplateReservedWeight(const ArgsManager& args)
+{
+    return static_cast<size_t>(args.GetIntArg("-blockreservedweight", DEFAULT_BLOCK_RESERVED_WEIGHT) +
+                               args.GetIntArg("-auxpowreservedweight", DEFAULT_AUXPOW_RESERVED_WEIGHT));
+}
+
 static RPCHelpMan getblocktemplate()
 {
     return RPCHelpMan{
@@ -880,7 +892,7 @@ static RPCHelpMan getblocktemplate()
         // a delay to each getblocktemplate call. This differs from typical
         // long-lived IPC usage, where the overhead is paid only when creating
         // the initial template.
-        block_template = miner.createNewBlock({.include_dummy_extranonce = true}, /*cooldown=*/false);
+        block_template = miner.createNewBlock({.block_reserved_weight = AuxpowTemplateReservedWeight(EnsureArgsman(node)), .include_dummy_extranonce = true}, /*cooldown=*/false);
         CHECK_NONFATAL(block_template);
 
 
@@ -1274,10 +1286,7 @@ static RPCHelpMan createauxblock()
         // (e.g. testnet/regtest), matching the other block-creating RPCs here.
         // The auxpow is attached only at submission and counts towards the
         // block weight, so leave room for it beyond the usual reserve.
-        const ArgsManager& args{EnsureArgsman(node)};
-        const size_t reserved_weight{static_cast<size_t>(args.GetIntArg("-blockreservedweight", DEFAULT_BLOCK_RESERVED_WEIGHT) +
-                                                         args.GetIntArg("-auxpowreservedweight", DEFAULT_AUXPOW_RESERVED_WEIGHT))};
-        std::unique_ptr<BlockTemplate> block_template(miner.createNewBlock({ .block_reserved_weight = reserved_weight, .coinbase_output_script = coinbase_output_script, .include_dummy_extranonce = true }));
+        std::unique_ptr<BlockTemplate> block_template(miner.createNewBlock({ .block_reserved_weight = AuxpowTemplateReservedWeight(EnsureArgsman(node)), .coinbase_output_script = coinbase_output_script, .include_dummy_extranonce = true }));
         if (!block_template) {
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Could not create new block template");
         }

@@ -10,7 +10,8 @@
 - a template stays submittable, also after a rejected submission, until a
   call after a tip change drops it
 - submitauxblock rejects an auxpow with leftover bytes
-- templates leave -auxpowreservedweight room for the auxpow
+- templates leave -auxpowreservedweight room for the auxpow, in createauxblock
+  and in getblocktemplate (a full block with a large auxpow: rpc_gbt_auxpow_weight.py)
 """
 
 import re
@@ -104,7 +105,7 @@ class CreateAuxBlockTest(BitcoinTestFramework):
             wallet.sendtoaddress(wallet.getnewaddress(), 0.1)
         mempool_size = len(node.getrawmempool())
         gbt = node.getblocktemplate({"rules": ["segwit"]})
-        assert_equal(len(gbt["transactions"]), mempool_size)  # fits with the default 8,000 WU reserve
+        assert_greater_than(mempool_size, len(gbt["transactions"]))  # getblocktemplate reserves the auxpow weight too
         aux = node.createauxblock(addr1)
         auxpow = create_auxpow(aux["hash"], aux["bits"])
         assert node.submitauxblock(aux["hash"], auxpow)
@@ -112,6 +113,7 @@ class CreateAuxBlockTest(BitcoinTestFramework):
         weight_without_auxpow = block["weight"] - 4 * len(bytes.fromhex(auxpow))
         assert weight_without_auxpow <= MAX_WEIGHT - DEFAULT_AUXPOW_RESERVED_WEIGHT
         assert_greater_than(mempool_size, block["nTx"] - 1)
+        assert_equal(block["nTx"] - 1, len(gbt["transactions"]))  # both paths build the same template
         assert_greater_than(block["nTx"] - 1, 0)
 
         self.log.info("-auxpowreservedweight=0 builds the same template as getblocktemplate")
