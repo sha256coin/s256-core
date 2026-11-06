@@ -32,6 +32,7 @@ env:
     feature_auxpow_headers.py
     p2p_auxpow_headers.py
     rpc_createauxblock.py
+    rpc_createauxblock_idle.py
 
 jobs:
   auxpow:

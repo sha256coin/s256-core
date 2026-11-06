@@ -5,7 +5,8 @@
 """Test createauxblock template handling.
 
 - polling returns the same template per payout address until the tip
-  changes, or until the mempool changed and the template is a minute old
+  changes, or until the template is a minute old (see
+  rpc_createauxblock_idle.py)
 - a template stays submittable, also after a rejected submission, until a
   call after a tip change drops it
 - submitauxblock rejects an auxpow with leftover bytes
@@ -68,8 +69,12 @@ class CreateAuxBlockTest(BitcoinTestFramework):
         refreshed = node.createauxblock(addr1)
         assert refreshed["hash"] != first["hash"]
         assert_equal(node.createauxblock(addr1), refreshed)
-        self.log.info("Without mempool changes the template is not refreshed")
+        self.log.info("Without mempool changes the template is refreshed too, once a minute old")
+        node.setmocktime(now + 120)
+        assert_equal(node.createauxblock(addr1), refreshed)
         node.setmocktime(now + 200)
+        refreshed = node.createauxblock(addr1)
+        assert refreshed["hash"] != first["hash"]
         assert_equal(node.createauxblock(addr1), refreshed)
 
         self.log.info("Templates stay submittable until the tip changes, also after a rejected proof")

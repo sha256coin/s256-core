@@ -295,6 +295,7 @@ BASE_SCRIPTS = [
     'feature_auxpow_commitment.py',
     'feature_auxpow_namecoin.py',
     'rpc_createauxblock.py',
+    'rpc_createauxblock_idle.py',
     'p2p_auxpow_headers.py',
     'feature_ibd_tip_age.py',
     'mining_ibd_mainnet.py',

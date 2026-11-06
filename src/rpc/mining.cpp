@@ -47,7 +47,10 @@
 #include <validationinterface.h>
 
 #include <cstdint>
+#include <map>
 #include <memory>
+#include <optional>
+#include <set>
 
 using interfaces::BlockRef;
 using interfaces::BlockTemplate;
@@ -1156,26 +1159,42 @@ static RPCHelpMan submitheader()
 // each needing their own in-flight template to submit against later.
 namespace {
 GlobalMutex g_auxblock_mutex;
-std::map<uint256, std::shared_ptr<CBlock>> g_auxblock_templates GUARDED_BY(g_auxblock_mutex);
+struct AuxBlockTemplate {
+    std::shared_ptr<CBlock> block;
+    int64_t created; //!< GetTime() when the template was built
+};
+std::map<uint256, AuxBlockTemplate> g_auxblock_templates GUARDED_BY(g_auxblock_mutex);
 
 //! The template createauxblock currently hands out for each coinbase output
-//! script. Like Namecoin's AuxpowMiner, it is reused until the tip changes,
-//! or until the mempool has changed and the template is a minute old, so
-//! pools polling every few seconds don't pile up one template per call.
+//! script. Like Namecoin's AuxpowMiner, it is reused until the tip changes
+//! or it is a minute old, so pools polling every few seconds don't pile up
+//! one template per call. It is rebuilt when a minute old even if the
+//! mempool is unchanged: the block time is set when the template is built,
+//! so a stale template would give blocks found later an old timestamp.
 struct CurrentAuxBlock {
     uint256 hash;
-    unsigned int tx_updated;
     int64_t created;
 };
 std::map<CScript, CurrentAuxBlock> g_auxblock_current GUARDED_BY(g_auxblock_mutex);
 constexpr int64_t AUXBLOCK_REFRESH_SECONDS{60};
+//! How long a template that is no longer current stays submittable. A pool
+//! can keep a parent job, with an older template's hash inside, for much
+//! longer than the refresh interval; dropping it early would lose a block.
+constexpr int64_t AUXBLOCK_KEEP_SECONDS{600};
 
-//! Drop any tracked templates no longer built on the current tip, so pollers
-//! that never submit don't leak memory indefinitely.
-void PruneStaleAuxBlockTemplates(const uint256& current_tip) EXCLUSIVE_LOCKS_REQUIRED(g_auxblock_mutex)
+//! Drop templates that are no longer current and older than
+//! AUXBLOCK_KEEP_SECONDS, and, if current_tip is given, templates that are
+//! not built on it, so pollers that never submit don't leak memory
+//! indefinitely. The current template of each address is always kept,
+//! whatever its age.
+void PruneStaleAuxBlockTemplates(const std::optional<uint256>& current_tip) EXCLUSIVE_LOCKS_REQUIRED(g_auxblock_mutex)
 {
+    const int64_t now{GetTime()};
+    std::set<uint256> current;
+    for (const auto& [script, cur] : g_auxblock_current) current.insert(cur.hash);
     for (auto it = g_auxblock_templates.begin(); it != g_auxblock_templates.end();) {
-        if (it->second->hashPrevBlock != current_tip) {
+        const bool expired{now - it->second.created > AUXBLOCK_KEEP_SECONDS && !current.contains(it->first)};
+        if ((current_tip && it->second.block->hashPrevBlock != *current_tip) || expired) {
             it = g_auxblock_templates.erase(it);
         } else {
             ++it;
@@ -1221,7 +1240,6 @@ static RPCHelpMan createauxblock()
     NodeContext& node = EnsureAnyNodeContext(request.context);
     Mining& miner = EnsureMining(node);
     ChainstateManager& chainman = EnsureChainman(node);
-    const CTxMemPool& mempool = EnsureMemPool(node);
 
     // Like getblocktemplate (and Namecoin's createauxblock): don't hand out
     // templates on a tip that is probably stale. Test chains are exempt.
@@ -1243,14 +1261,11 @@ static RPCHelpMan createauxblock()
 
     std::shared_ptr<CBlock> block;
     if (const auto cur = g_auxblock_current.find(coinbase_output_script); cur != g_auxblock_current.end()) {
-        const bool stale{mempool.GetTransactionsUpdated() != cur->second.tx_updated &&
-                         GetTime() - cur->second.created > AUXBLOCK_REFRESH_SECONDS};
-        if (!stale) block = g_auxblock_templates.at(cur->second.hash);
+        const bool stale{GetTime() - cur->second.created > AUXBLOCK_REFRESH_SECONDS};
+        if (!stale) block = g_auxblock_templates.at(cur->second.hash).block;
     }
 
     if (!block) {
-        const unsigned int tx_updated{mempool.GetTransactionsUpdated()};
-
         // include_dummy_extranonce: at height <=16, CScript() << nHeight alone
         // (BIP34) serializes to a single-byte OP_N push, one byte short of the
         // consensus-required 2-byte-minimum coinbase scriptSig ("bad-cb-length")
@@ -1283,8 +1298,9 @@ static RPCHelpMan createauxblock()
         // The tip may have moved while the template was built.
         PruneStaleAuxBlockTemplates(block->hashPrevBlock);
         const uint256 hash = block->GetHash();
-        g_auxblock_templates[hash] = block;
-        g_auxblock_current[coinbase_output_script] = {hash, tx_updated, GetTime()};
+        const int64_t created{GetTime()};
+        g_auxblock_templates[hash] = {block, created};
+        g_auxblock_current[coinbase_output_script] = {hash, created};
     }
     const uint256 hash = block->GetHash();
 
@@ -1330,16 +1346,21 @@ static RPCHelpMan submitauxblock()
 {
     const uint256 hash = ParseHashV(request.params[0], "hash");
 
+    ChainstateManager& chainman = EnsureAnyChainman(request.context);
     std::shared_ptr<CBlock> block;
     {
         LOCK(g_auxblock_mutex);
+        // Apply the age rule here too, so what is accepted does not depend
+        // on whether anyone polled createauxblock since. Templates on an old
+        // tip stay submittable until createauxblock drops them.
+        PruneStaleAuxBlockTemplates(std::nullopt);
         auto it = g_auxblock_templates.find(hash);
         if (it == g_auxblock_templates.end()) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "block hash unknown; call createauxblock first, or the template expired");
         }
         // Copy out: the tracked template may still be handed to other
         // concurrent submitters/pruned while we validate this one.
-        block = std::make_shared<CBlock>(*it->second);
+        block = std::make_shared<CBlock>(*it->second.block);
     }
 
     const std::string auxpow_hex = request.params[1].get_str();
@@ -1367,7 +1388,6 @@ static RPCHelpMan submitauxblock()
     // must not be touched again here (see the comment there).
     block->auxpow = auxpow;
 
-    ChainstateManager& chainman = EnsureAnyChainman(request.context);
     {
         LOCK(cs_main);
         const CBlockIndex* pindex = chainman.m_blockman.LookupBlockIndex(block->hashPrevBlock);
