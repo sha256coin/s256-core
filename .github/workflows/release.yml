@@ -12,6 +12,9 @@ name: Release
 # there's no macOS SDK available for cross-compiling here) and also
 # produce a self-contained .app + .dmg via the `deploy` CMake target.
 #
+# Test gate (also): the `functional` job runs the AuxPoW functional tests
+# (functional-tests.yml) and `publish` needs it.
+#
 # Test gate: the linux64 and both macOS legs run test_bitcoin (native, so
 # they actually can) with the exclude list documented in the S256
 # test-debt notes -- everything in that list is either a known
@@ -236,8 +239,14 @@ jobs:
             SHA256Coin-*.dmg
           if-no-files-found: error
 
+  # AuxPoW functional tests (functional-tests.yml). A failure here blocks
+  # publishing, like a failing unit test in the build legs above.
+  functional:
+    name: Functional tests
+    uses: ./.github/workflows/functional-tests.yml
+
   publish:
-    needs: [build, macos, macos-intel]
+    needs: [build, macos, macos-intel, functional]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     permissions:

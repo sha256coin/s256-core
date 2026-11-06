@@ -1,0 +1,55 @@
+name: Functional tests
+
+# Runs the S256 merge-mining (AuxPoW) functional tests on a native Linux
+# build. Reusable: release.yml calls it as the `functional` job and its
+# `publish` job needs it, so a failing test blocks publishing. It also runs
+# on pushes to main and release/** and on pull requests, so a regression
+# shows up before a tag is cut.
+#
+# Only the daemon and the tools the test framework needs are built (no GUI,
+# no Windows or macOS legs), so this is much cheaper than a release run.
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'release/**'
+
+permissions:
+  contents: read
+
+env:
+  # The auxpow set the release gate runs. Add new auxpow/merge-mining
+  # functional tests here: every one of them must pass before a release is
+  # published.
+  AUXPOW_TESTS: >-
+    feature_auxpow_namecoin.py
+    feature_auxpow_commitment.py
+    feature_auxpow_segwit.py
+    feature_auxpow_headers.py
+    p2p_auxpow_headers.py
+    rpc_createauxblock.py
+
+jobs:
+  auxpow:
+    name: AuxPoW functional tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake make g++ ninja-build pkgconf python3 libboost-dev libevent-dev libsqlite3-dev libzmq3-dev
+
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_IPC=OFF -DBUILD_GUI=OFF -DBUILD_TESTS=ON -DBUILD_TX=ON -DBUILD_UTIL=ON -DBUILD_WALLET_TOOL=ON -DWITH_ZMQ=ON
+
+      - name: Build
+        run: cmake --build build -j$(nproc) --target bitcoind bitcoin-cli bitcoin-tx bitcoin-util bitcoin-wallet
+
+      - name: Run AuxPoW functional tests
+        run: python3 build/test/functional/test_runner.py --jobs=$(nproc) ${{ env.AUXPOW_TESTS }}
