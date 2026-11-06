@@ -26,7 +26,8 @@
 /* Replacement for %s in copyright holders string */
 #define COPYRIGHT_HOLDERS_SUBSTITUTION "@CLIENT_NAME@"
 
-/* Copyright year */
+/* Copyright year, and the year SHA256Coin began (the Bitcoin Core line starts in 2009) */
+#define COPYRIGHT_START_YEAR @COPYRIGHT_START_YEAR@
 #define COPYRIGHT_YEAR @COPYRIGHT_YEAR@
 
 /* Define if external signer support is enabled */

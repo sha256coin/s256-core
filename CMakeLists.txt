@@ -32,6 +32,8 @@ set(CLIENT_VERSION_MINOR 0)
 set(CLIENT_VERSION_BUILD 1)
 set(CLIENT_VERSION_RC 0)
 set(CLIENT_VERSION_IS_RELEASE "true")
+# SHA256Coin began in 2025; the Bitcoin Core line keeps its own start year (2009).
+set(COPYRIGHT_START_YEAR "2025")
 set(COPYRIGHT_YEAR "2026")
 
 # During the enabling of the CXX and CXXOBJ languages, we modify

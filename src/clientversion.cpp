@@ -71,14 +71,15 @@ std::string FormatSubVersion(const std::string& name, int nClientVersion, const 
     return strprintf("/%s:%s%s/", name, FormatVersion(nClientVersion), comments_str);
 }
 
-std::string CopyrightHolders(const std::string& strPrefix)
+std::string CopyrightHolders(const std::string& client_prefix, const std::string& core_prefix)
 {
     const auto copyright_devs = strprintf(_(COPYRIGHT_HOLDERS), COPYRIGHT_HOLDERS_SUBSTITUTION).translated;
-    std::string strCopyrightHolders = strPrefix + copyright_devs;
+    std::string strCopyrightHolders = client_prefix + copyright_devs;
 
-    // Make sure Bitcoin Core copyright is not removed by accident
+    // Make sure Bitcoin Core copyright is not removed by accident. It has its
+    // own start year (2009); the client's line starts when the client did.
     if (copyright_devs.find("Bitcoin Core") == std::string::npos) {
-        strCopyrightHolders += "\n" + strPrefix + "The Bitcoin Core developers";
+        strCopyrightHolders += "\n" + core_prefix + "The Bitcoin Core developers";
     }
     return strCopyrightHolders;
 }
@@ -87,7 +88,8 @@ std::string LicenseInfo()
 {
     const std::string URL_SOURCE_CODE = "<https://github.com/sha256coin/s256-core>";
 
-    return CopyrightHolders(strprintf(_("Copyright (C) %i-%i"), 2009, COPYRIGHT_YEAR).translated + " ") + "\n" +
+    return CopyrightHolders(strprintf(_("Copyright (C) %i-%i"), COPYRIGHT_START_YEAR, COPYRIGHT_YEAR).translated + " ",
+                            strprintf(_("Copyright (C) %i-%i"), 2009, COPYRIGHT_YEAR).translated + " ") + "\n" +
            "\n" +
            strprintf(_("Please contribute if you find %s useful. "
                        "Visit %s for further information about the software."),

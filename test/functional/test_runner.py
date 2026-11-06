@@ -184,6 +184,7 @@ BASE_SCRIPTS = [
     'tool_bitcoin_chainstate.py',
     'tool_wallet.py',
     'tool_utils.py',
+    'tool_version_copyright.py',
     'tool_signet_miner.py',
     'wallet_txn_clone.py',
     'wallet_txn_clone.py --segwit',
