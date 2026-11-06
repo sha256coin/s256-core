@@ -187,3 +187,21 @@ address literals and vectors, Bitcoin's genesis hash, the literal
 ## Skipped tests
 
 None yet.
+
+## Failing on both 3.0.1 and release/v3.0.2 (compared 2026-11-06)
+
+Found while checking the minimum-protocol change: every `p2p_*` test, and the 28 other tests that connect peers, were run on the 3.0.1 build and on the branch build. These fail on both, so they are old test debt, not regressions. Causes are in `debug/FUNCTIONAL_TRIAGE.md` (not in this repo). To port on main:
+
+| Test | Cause |
+|---|---|
+| `p2p_1p1c_network.py` | MiniWallet finds no mature UTXO (maturity 200) |
+| `p2p_orphan_handling.py` | same |
+| `p2p_invalid_tx.py` (v1 and v2 transport) | Bitcoin maturity/heights |
+| `p2p_mutated_blocks.py` | maturity: `[101] == [201]` |
+| `p2p_headers_sync_with_minchainwork.py` | Bitcoin's regtest genesis hash |
+| `feature_assumevalid.py`, `feature_block.py`, `feature_cltv.py`, `feature_dersig.py` | coinbase maturity 100 / chain heights 200 |
+| `feature_maxuploadtarget.py` | MiniWallet finds no mature UTXO |
+| `feature_versionbits_warning.py` | warning period on test chains is 72 blocks, not 144 |
+| `mempool_reorg.py`, `rpc_getblockfrompeer.py` | Bitcoin maturity/heights (see the triage) |
+| `p2p_dns_seeds.py` | not a value problem: passes alone (36 s), failed only in a 16-job parallel run on both builds; load-sensitive |
+
