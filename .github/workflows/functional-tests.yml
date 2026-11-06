@@ -33,6 +33,7 @@ env:
     p2p_auxpow_headers.py
     rpc_createauxblock.py
     rpc_createauxblock_idle.py
+    rpc_createauxblock_ibd.py
     rpc_gbt_auxpow_weight.py
 
 jobs:

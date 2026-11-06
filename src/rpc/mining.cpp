@@ -1286,7 +1286,14 @@ static RPCHelpMan createauxblock()
         // (e.g. testnet/regtest), matching the other block-creating RPCs here.
         // The auxpow is attached only at submission and counts towards the
         // block weight, so leave room for it beyond the usual reserve.
-        std::unique_ptr<BlockTemplate> block_template(miner.createNewBlock({ .block_reserved_weight = AuxpowTemplateReservedWeight(EnsureArgsman(node)), .coinbase_output_script = coinbase_output_script, .include_dummy_extranonce = true }));
+        // Opt out of the cooldown, as getblocktemplate and the generate RPCs
+        // do: it waits for initial block download to end, which on a test
+        // chain with an old tip never happens by itself. We hold
+        // g_auxblock_mutex here, so such a wait would block every other
+        // createauxblock call, then all RPC workers, and with them the
+        // submission that could end it. On mainnet the IBD check above
+        // already refuses to hand out templates.
+        std::unique_ptr<BlockTemplate> block_template(miner.createNewBlock({ .block_reserved_weight = AuxpowTemplateReservedWeight(EnsureArgsman(node)), .coinbase_output_script = coinbase_output_script, .include_dummy_extranonce = true }, /*cooldown=*/false));
         if (!block_template) {
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Could not create new block template");
         }
