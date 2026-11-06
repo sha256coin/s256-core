@@ -299,6 +299,7 @@ BASE_SCRIPTS = [
     'rpc_createauxblock_ibd.py',
     'rpc_gbt_auxpow_weight.py',
     'p2p_auxpow_headers.py',
+    'p2p_min_protocol.py',
     'feature_ibd_tip_age.py',
     'mining_ibd_mainnet.py',
     'mining_basic.py',

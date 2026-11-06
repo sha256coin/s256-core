@@ -42,7 +42,6 @@ from test_framework.util import (
 
 THRESHOLD_HEADERS_SIZE = 2_000_000
 MAX_PROTOCOL_MESSAGE_LENGTH = 4_000_000
-OLD_P2P_VERSION = 70016
 
 
 def big_auxpow(aux, padding):
@@ -151,13 +150,12 @@ class AuxpowHeadersP2PTest(BitcoinTestFramework):
         assert_equal(header.serialize().hex(), node.getblockheader(tip, False))
 
         self.log.info("getheaders replies stop at the size threshold")
-        for version in (None, OLD_P2P_VERSION):
-            peer = node.add_p2p_connection(HeadersCollector(version))
-            msgs = self.get_all_headers(peer, node)
-            assert_greater_than(len(msgs), 2)
-            headers = self.check_capped(msgs, node)
-            assert all(h.auxpow is not None for h in headers[20:])
-            node.disconnect_p2ps()
+        peer = node.add_p2p_connection(HeadersCollector())
+        msgs = self.get_all_headers(peer, node)
+        assert_greater_than(len(msgs), 2)
+        headers = self.check_capped(msgs, node)
+        assert all(h.auxpow is not None for h in headers[20:])
+        node.disconnect_p2ps()
 
         self.log.info("A fresh node syncs through size-capped replies")
         self.connect_nodes(1, 0)

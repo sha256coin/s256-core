@@ -16,8 +16,13 @@ static const int PROTOCOL_VERSION = 70101;
 //! initial proto version, to be increased after version/verack negotiation
 static const int INIT_PROTO_VERSION = 209;
 
-//! disconnect from peers older than this proto version
-static const int MIN_PEER_PROTO_VERSION = 31800;
+//! disconnect from peers older than this proto version.
+//! S256: 70101 (3.0.1), the first version that can decode merge-mined blocks in
+//! Namecoin's auxpow format. Older nodes stop at mainnet block 17,499, so they
+//! are of no use as peers. Equal to PROTOCOL_VERSION: every peer that stays
+//! connected negotiates exactly that version. Pool software that connects over
+//! P2P for block notifications must send at least this version.
+static const int MIN_PEER_PROTO_VERSION = 70101;
 
 //! BIP 0031, pong message, is enabled for all versions AFTER this one
 static const int BIP0031_VERSION = 60000;
