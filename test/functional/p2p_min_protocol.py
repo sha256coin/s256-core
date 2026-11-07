@@ -27,6 +27,10 @@ class VersionPeer(P2PInterface):
     def __init__(self, version):
         super().__init__()
         self.version = version
+        self.opened = False
+
+    def on_open(self):
+        self.opened = True
 
     def peer_connect_send_version(self, services):
         super().peer_connect_send_version(services)
@@ -54,9 +58,13 @@ class MinProtocolTest(BitcoinTestFramework):
         for old_version in (MIN_PEER_PROTO_VERSION - 1, 70016, 70002):
             self.log.info(f"A peer announcing {old_version} is disconnected, and the node says why")
             with node.assert_debug_log([f"peer using obsolete version {old_version}"]):
-                peer = node.add_p2p_connection(VersionPeer(old_version), wait_for_verack=False)
-                peer.wait_for_disconnect()
-            assert_equal(len(node.getpeerinfo()), 0)
+                # The node drops the peer as soon as it reads the version, which
+                # on a fast machine can be before add_p2p_connection() polls
+                # is_connected: don't wait for the connection, wait for it to
+                # have opened and closed.
+                peer = node.add_p2p_connection(VersionPeer(old_version), expect_success=False)
+                peer.wait_until(lambda: peer.opened and not peer.is_connected, check_connected=False)
+            self.wait_until(lambda: len(node.getpeerinfo()) == 0)
 
 
 if __name__ == '__main__':
