@@ -44,7 +44,7 @@ Other changes
 Testing
 -------
 
-- **Real pool software.** On a local test pool (sha256-nomp with node-stratum-pool, merge-mining S256 on a regtest parent chain), the pool was left idle for six minutes and then found one block. The block time of that block was **400 seconds behind** its arrival on 3.0.1, and **31 seconds behind** on 3.0.2.
+- **Real pool software.** On a local test pool (sha256-nomp with node-stratum-pool, merge-mining S256 on a regtest parent chain), the pool was left idle for six minutes and then found one block. The block time of that block was **400 seconds behind** its arrival on 3.0.1, and **41 seconds behind** on 3.0.2.
 - **Functional tests.** New tests cover the template refresh and retention, a nearly full block with a large auxpow through both `getblocktemplate` and `createauxblock`, the `createauxblock` hang, the minimum protocol version, the checkpoint and the copyright lines. Each fails on 3.0.1. The release workflow now runs the AuxPoW functional tests, and a failure blocks publishing.
 
 Platforms

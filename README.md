@@ -16,6 +16,19 @@ S256 is a Bitcoin fork that takes the contrarian approach: **"Double the Work, D
 
 Based on Bitcoin Core v31.1, S256 doubles key parameters for a slower, more deliberate chain:
 
+## What's New in v3.0.2
+
+**Recommended upgrade, strongly recommended for merge-mining pools.** No fork and no activation height: nodes on v3.0.1 keep following the same chain. No reindex is needed.
+
+- **Current block timestamps for merge-mined blocks** — `createauxblock` now rebuilds its template once it is a minute old. Before, a block found after an idle stretch could carry a timestamp up to about two hours old, and the difficulty adjustment (LWMA) then reacted one block late. This only helps once the pool runs v3.0.2.
+- **`getblocktemplate` reserves room for the auxpow by default** (40,000 weight units, as `createauxblock` already did). Opt out with `-auxpowreservedweight=0`.
+- **`createauxblock` no longer hangs the RPC server** on a test chain in initial block download.
+- **Minimum peer protocol version 70101** — nodes older than v3.0.1 are disconnected. Pools that use P2P block notification must announce 70101 or higher.
+- **Checkpoint at block 18,000**, and faster initial sync up to that block.
+- **Release downloads include `SHA256SUMS.txt`**, and the copyright line now reads 2025-2026.
+
+Full details: [doc/release-notes.md](doc/release-notes.md). Pool and proxy operators: [POOL_PROXY_NOTE.md](POOL_PROXY_NOTE.md).
+
 ## What's New in v3.0.1
 
 **Mandatory upgrade before mainnet block 17,500**, also for nodes already on v3.0.0. No reindex is needed.
