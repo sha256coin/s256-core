@@ -109,7 +109,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
-          path: SHA256Coin-*
+          # Only the archives: the unpacked SHA256Coin-<ver>-<target>/ folder
+          # next to them would end up in dist/ and break the checksum step.
+          path: |
+            SHA256Coin-*.tar.gz
+            SHA256Coin-*.zip
           if-no-files-found: error
 
   # macOS legs build natively on GitHub's runners (Homebrew Qt6, no
@@ -266,13 +270,13 @@ jobs:
         working-directory: dist
         run: |
           set -euo pipefail
-          sha256sum SHA256Coin-* > SHA256SUMS.txt
+          find . -maxdepth 1 -type f -name 'SHA256Coin-*' -printf '%f\n' | sort | xargs sha256sum > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          files: dist/*.*
           body_path: doc/release-notes.md
           generate_release_notes: false
           prerelease: ${{ contains(github.ref_name, '-rc') }}
